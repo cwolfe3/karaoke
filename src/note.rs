@@ -1,4 +1,4 @@
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct Note {
 	pub length: u32,
 	pub pitch: i8,

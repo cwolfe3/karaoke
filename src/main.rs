@@ -4,6 +4,7 @@ mod note;
 mod song;
 mod song_view;
 mod mic;
+mod song_panel;
 
 //use std::path::Path;
 //use song::Song;
@@ -12,7 +13,7 @@ mod mic;
 //use cursive::traits::Nameable;
 
 fn main() {
-	mic::test();
+    song_panel::main();
 	//let song = Song::read(Path::new("test.song"));
 
 	//let mut siv = cursive::default();

@@ -22,7 +22,7 @@ pub fn test() {
 	
 }
 
-struct Microphone {
+pub struct Microphone {
 	device: cpal::Device,
 	stream: cpal::Stream,
 	config: StreamConfig,
@@ -34,7 +34,7 @@ struct Microphone {
 }
 
 impl Microphone {
-	fn new(device: cpal::Device) -> Microphone {
+	pub fn new(device: cpal::Device) -> Microphone {
 		let mut configs_range = device.supported_input_configs()
 			.expect("No supported configs");
 		let config = configs_range.next()
