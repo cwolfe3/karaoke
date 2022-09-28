@@ -1,5 +1,6 @@
 //use std::env;
 
+mod note;
 mod song;
 mod song_view;
 mod mic;
@@ -11,11 +12,11 @@ mod mic;
 //use cursive::traits::Nameable;
 
 fn main() {
-    mic::test();
-    //let song = Song::read(Path::new("test.song"));
+	mic::test();
+	//let song = Song::read(Path::new("test.song"));
 
-    //let mut siv = cursive::default();
-    //siv.add_global_callback('q', |s| s.quit());
-    //siv.add_layer(views::ScrollView::new(SongView::new(song).with_name("view")).scroll_x(true));
-    //siv.run();
+	//let mut siv = cursive::default();
+	//siv.add_global_callback('q', |s| s.quit());
+	//siv.add_layer(views::ScrollView::new(SongView::new(song).with_name("view")).scroll_x(true));
+	//siv.run();
 }
