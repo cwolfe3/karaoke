@@ -3,7 +3,7 @@ use cpal::traits::HostTrait;
 use iced::time;
 use iced::executor;
 use iced::widget::canvas::event::{self, Event};
-use iced::widget::canvas::{self, Canvas, Geometry, Cursor, Frame, Path};
+use iced::widget::canvas::{self, Canvas, Geometry, Cursor, Frame, Path, Stroke};
 use iced::{
     Application,
     Command,
@@ -36,7 +36,7 @@ struct SongSession {
 }
 #[derive(Debug)]
 enum Message {
-    Tick(Duration)
+    Tick(Instant)
 }
 
 impl Application for SongSession {
@@ -61,11 +61,14 @@ impl Application for SongSession {
     }
 
     fn update(&mut self, message: Message) -> Command<Message> {
-        println!("SDFSDF");
         match message {
             Message::Tick(duration) => {
-                let note = self.mic1.consume();
-                self.song1.add_after(note.unwrap());
+                match self.mic1.consume() {
+                    Some(note) => {
+                        self.song1.add_after(note)
+                    },
+                    None => (),
+                }
             }
         }
         Command::none()
@@ -80,30 +83,48 @@ impl Application for SongSession {
     }
 
     fn subscription(&self) -> Subscription<Message> {
-        unimplemented!();
+        time::every(Duration::from_millis(100)).map(Message::Tick)
     }
 }
 
 impl canvas::Program<Message> for SongSession {
     fn draw(&self, bounds: Rectangle, _cursor: Cursor) -> Vec<Geometry> {
+        let voiced_stroke = Stroke {
+            color: Color::new(0.0, 0.2, 1.0, 1.0),
+            width: 5.0,
+            ..Stroke::default()
+        };
+        let rest_stroke = Stroke {
+            color: Color::WHITE,
+            width: 5.0,
+            ..Stroke::default()
+        };
         let mut frame = Frame::new(bounds.size()); 
+        let mut length = 0;
         for phrase in &self.song1.phrases {
             for note in phrase {
-                let path = note_path(note.clone());
-                frame.fill(&path, Color::BLACK);
+                let path = note_path(note.clone(), length);
+                length += note.length;
+                if note.voiced {
+                    frame.stroke(&path, voiced_stroke);
+                } else {
+                    frame.stroke(&path, rest_stroke);
+                }
             }
         }
         vec![frame.into_geometry()]
     }
 }
 
-fn note_path(note: Note) -> Path {
+fn note_path(note: Note, length: u32) -> Path {
+    let y = note.pitch as f32;
+    let x = length as f32;
     Path::line(
-        note_to_frame_transform(Point::new(0.0, 0.0)),
-        note_to_frame_transform(Point::new((note.length as f32) * 100.0, 0.0))
+        note_to_frame_transform(Point::new(x, y)),
+        note_to_frame_transform(Point::new(x + (note.length as f32), y))
         )
 }
 
 fn note_to_frame_transform(point: Point) -> Point {
-    Point::new(point.x, point.y)
+    Point::new(point.x / 100.0, 100.0 - point.y)
 }

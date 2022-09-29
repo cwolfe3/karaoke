@@ -40,6 +40,9 @@ impl Song {
 		let (p, n) = self.select_begin;
 		match self.select_mode {
 			SelectMode::Note => {
+			    if self.phrases.len() == 0 {
+			        self.phrases.push(Vec::new());
+			    }
 				if self.phrases[p].len() == 0 {
 					self.phrases[p].push(note);
 					self.select_end.1 = n + 1
@@ -59,6 +62,9 @@ impl Song {
 		let (p, n) = self.select_begin;
 		match self.select_mode {
 			SelectMode::Note => {
+			    if self.phrases.len() == 0 {
+			        self.phrases.push(Vec::new());
+			    }
 				if self.phrases[p].len() == 0 || n == self.phrases[p].len() {
 					self.phrases[p].push(note);
 				} else {
