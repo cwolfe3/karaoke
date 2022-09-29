@@ -7,21 +7,6 @@ use futures::Stream;
 
 use crate::note::Note;
 
-pub fn test() {
-	let host = cpal::default_host();
-	let device = host.default_output_device().expect("No available device");
-	let mut mic = Microphone::new(device);
-	mic.set_window_length(time::Duration::from_millis(20));
-	mic.play();
-
-	loop {
-		thread::sleep(time::Duration::from_millis(10));
-		let note = mic.consume();
-		println!("{:?}", note);
-	}
-	
-}
-
 pub struct Microphone {
 	device: cpal::Device,
 	stream: cpal::Stream,
