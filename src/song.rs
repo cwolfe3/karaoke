@@ -16,6 +16,8 @@ pub struct Song {
 	pub select_mode: SelectMode,
 	pub select_begin: NoteIndex,
 	pub select_end: NoteIndex,
+	seek_pos: u32,
+	seek_note_index: NoteIndex,
 }
 
 pub enum SelectMode {
@@ -33,6 +35,8 @@ impl Song {
 			select_mode: SelectMode::Note,
 			select_begin: (0, 0),
 			select_end: (1, 1),
+			seek_pos: 0,
+			seek_note_index: (0, 0),
 		}
 	}
 
@@ -326,4 +330,8 @@ impl Song {
 			Ok(_) => println!("Wrote to {}", display),
 		}
 	}
+
+    pub fn get_phrase(&self, i: usize) -> Option<&Phrase> {
+        self.phrases.get(i)
+    }
 }

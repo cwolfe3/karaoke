@@ -185,7 +185,7 @@ impl Microphone {
 		freq
 	}
 
-	fn ready(&self) -> bool {
+	pub fn ready(&self) -> bool {
 		let needed_samples = self.needed_samples();
 		let available: u128 = self.consumer.len().try_into().unwrap();
 		available >= needed_samples as u128
