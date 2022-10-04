@@ -205,30 +205,46 @@ impl Application for SongSession {
 
 impl canvas::Program<Message> for SongSession {
     fn draw(&self, bounds: Rectangle, _cursor: Cursor) -> Vec<Geometry> {
-        let voiced_stroke = Stroke {
-            color: Color::new(0.0, 0.2, 1.0, 1.0),
-            width: 5.0,
-            ..Stroke::default()
-        };
-        let rest_stroke = Stroke {
-            color: Color::WHITE,
-            width: 5.0,
-            ..Stroke::default()
-        };
-        let mut frame = Frame::new(bounds.size()); 
-        let mut length = 0;
-        for phrase in &self.song.phrases {
-            for note in phrase {
-                let path = note_path(note.clone(), length);
-                length += note.length;
-                if note.voiced {
-                    frame.stroke(&path, voiced_stroke);
-                } else {
-                    frame.stroke(&path, rest_stroke);
+        match self.state {
+            State::Playing => {
+                let backing_stroke = Stroke {
+                    color: Color::new(0.5, 0.5, 0.5, 1.0),
+                    width: 5.0,
+                    ..Stroke::default()
+                };
+                let player_stroke = Stroke {
+                    color: Color::new(0.0, 0.2, 1.0, 1.0),
+                    width: 5.0,
+                    ..Stroke::default()
+                };
+                let rest_stroke = Stroke {
+                    color: Color::new(0.9, 0.9, 0.9, 1.0),
+                    width: 5.0,
+                    ..Stroke::default()
+                };
+                let mut frame = Frame::new(bounds.size()); 
+                let mut length = 0;
+
+                let backing_phrase = &self.backing_song.phrases[self.phrase_index];
+                //let singing_phrase = &self.song.phrases[self.phrase_index];
+                for note in backing_phrase {
+                    let path = note_path(note.clone(), length);
+                    length += note.length;
+                    if note.voiced {
+                        frame.stroke(&path, backing_stroke);
+                    } else {
+                        frame.stroke(&path, rest_stroke);
+                    }
                 }
+                vec![frame.into_geometry()]
+            },
+            State::Paused => {
+                Vec::new()
+            },
+            State::Finished => {
+                Vec::new()
             }
         }
-        vec![frame.into_geometry()]
     }
 }
 
@@ -248,5 +264,5 @@ fn note_path(note: Note, length: u32) -> Path {
 }
 
 fn note_to_frame_transform(point: Point) -> Point {
-    Point::new(point.x / 100.0, 100.0 - 5.0 * point.y)
+    Point::new(point.x / 100.0, 100.0 -  point.y)
 }
