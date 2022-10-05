@@ -79,10 +79,8 @@ impl SongSession {
     }
 
     fn split_into_chunks(num: u32) -> Vec<u32> {
-        let mut k = 1;
-        while num / k >= 80 {
-            k += 1;
-        }
+        let max_window_length = 20;
+        let k = (num + max_window_length - 1) / max_window_length;
         let remainder = num % k;
         let mut vec = vec![num / k; k as usize];
         vec[0] += remainder;
@@ -266,5 +264,5 @@ fn note_path(note: Note, length: u32) -> Path {
 }
 
 fn note_to_frame_transform(point: Point) -> Point {
-    Point::new(point.x / 20.0, 100.0 - point.y)
+    Point::new(point.x / 20.0, 100.0 - 5.0 * point.y)
 }
