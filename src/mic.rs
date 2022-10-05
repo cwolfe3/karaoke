@@ -88,7 +88,7 @@ impl Microphone {
 			self.elapsed_time += self.window_length;
 			let length = 1000.0 * samples.len() as f32 / self.config.sample_rate.0 as f32;
 
-			Some(Note::new(length as u32, note, true, "".to_string()))
+			Some(Note::new(self.window_length.as_millis() as u32, note, true, "".to_string()))
 		}
 	}
 

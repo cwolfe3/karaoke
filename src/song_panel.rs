@@ -53,7 +53,7 @@ enum State {
 }
 
 impl SongSession {
-    fn next_chunk(&mut self) -> bool {
+    fn next_chunk(&mut self) {
         self.chunk_index += 1;
         if self.chunk_index >= self.chunk_lengths.len() {
             self.chunk_index = 0;
@@ -63,29 +63,11 @@ impl SongSession {
                 self.phrase_index += 1;
                 if self.phrase_index >= self.backing_song.phrases.len() {
                     self.state = State::Finished;
-                } else {
-                    let note_length = self.backing_song.phrases[self.phrase_index][self.note_index].length;
-                    self.chunk_lengths = Self::split_into_chunks(note_length);
+                    return;
                 }
             }
-        }
-        let current_phrase = self.song.get_phrase(self.phrase_index);
-        match current_phrase {
-            Some(phrase) => {
-                self.note_index += 1;
-                if self.note_index >= phrase.len() {
-                    self.phrase_index += 1;
-                    self.note_index = 0;
-                    if self.phrase_index >= self.song.phrases.len() {
-                        false
-                    } else {
-                        true
-                    }
-                } else {
-                    false
-                }
-            },
-            None => false,
+            let note_length = self.backing_song.phrases[self.phrase_index][self.note_index].length;
+            self.chunk_lengths = Self::split_into_chunks(note_length);
         }
     }
 
@@ -98,7 +80,7 @@ impl SongSession {
 
     fn split_into_chunks(num: u32) -> Vec<u32> {
         let mut k = 1;
-        while num / k >= 160 {
+        while num / k >= 80 {
             k += 1;
         }
         let remainder = num % k;
@@ -123,10 +105,13 @@ impl SongSession {
                             let sung_note = self.mic.consume().unwrap();
                             let difference = current_note.pitch as i32 - sung_note.pitch as i32;
                             let difference = difference % 12;
-                            self.song.add_after(sung_note);
-                            println!("Difference: {} {}", difference, self.chunk_index);
+                            if self.phrase_index >= self.song.phrases.len() {
+                                self.song.phrases.push(Vec::new());
+                            }
+                            self.song.phrases[self.phrase_index].push(sung_note);
 
                             self.next_chunk();
+                            self.mic.set_window_length(Duration::from_millis(self.chunk_lengths[self.chunk_index].into()))
                         },
                         None => (),
                     }
@@ -223,10 +208,9 @@ impl canvas::Program<Message> for SongSession {
                     ..Stroke::default()
                 };
                 let mut frame = Frame::new(bounds.size()); 
-                let mut length = 0;
 
                 let backing_phrase = &self.backing_song.phrases[self.phrase_index];
-                //let singing_phrase = &self.song.phrases[self.phrase_index];
+                let mut length = 0;
                 for note in backing_phrase {
                     let path = note_path(note.clone(), length);
                     length += note.length;
@@ -236,6 +220,24 @@ impl canvas::Program<Message> for SongSession {
                         frame.stroke(&path, rest_stroke);
                     }
                 }
+
+                let singing_phrase = &self.song.phrases.get(self.phrase_index);
+                match singing_phrase {
+                    Some(phrase) => {
+                        let mut length = 0;
+                        for note in *phrase {
+                            let path = note_path(note.clone(), length);
+                            length += note.length;
+                            if note.voiced {
+                                frame.stroke(&path, player_stroke);
+                            } else {
+                                frame.stroke(&path, rest_stroke);
+                            }
+                        }
+                    },
+                    None => ()
+                }
+
                 vec![frame.into_geometry()]
             },
             State::Paused => {
@@ -255,7 +257,7 @@ impl SongSession {
 }
 
 fn note_path(note: Note, length: u32) -> Path {
-    let y = note.pitch as f32;
+    let y = (((note.pitch % 12) + 12) % 12) as f32;
     let x = length as f32;
     Path::line(
         note_to_frame_transform(Point::new(x, y)),
@@ -264,5 +266,5 @@ fn note_path(note: Note, length: u32) -> Path {
 }
 
 fn note_to_frame_transform(point: Point) -> Point {
-    Point::new(point.x / 100.0, 100.0 -  point.y)
+    Point::new(point.x / 20.0, 100.0 - point.y)
 }
