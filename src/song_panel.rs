@@ -2,7 +2,9 @@ use std::time::{Instant, Duration};
 use cpal::traits::HostTrait;
 use iced::time;
 use iced::executor;
-use iced::widget::canvas::{self, Canvas, Geometry, Cursor, Frame, Path, Stroke};
+use iced::widget::canvas::{self, Canvas, Geometry, Cursor, Frame, Path, Stroke, Text};
+use iced::Font;
+use iced::alignment::Horizontal;
 use iced::{
     Application,
     Command,
@@ -209,8 +211,9 @@ impl canvas::Program<Message> for SongSession {
 
                 let backing_phrase = &self.backing_song.phrases[self.phrase_index];
                 let mut length = 0;
-                for note in backing_phrase {
+                for (index, note) in backing_phrase.iter().enumerate() {
                     let path = note_path(note.clone(), length);
+
                     length += note.length;
                     if note.voiced {
                         frame.stroke(&path, backing_stroke);
@@ -235,6 +238,19 @@ impl canvas::Program<Message> for SongSession {
                     },
                     None => ()
                 }
+                
+                let lyrics : Vec<String> = backing_phrase.iter().map(|x| x.lyric.clone()).collect();
+                let lyrics = lyrics.join(" ");
+                let width = bounds.width;
+
+                let text = Text {
+                    content: lyrics,
+                    position: Point {x: width / 2.0, y: 0.0},
+                    horizontal_alignment: Horizontal::Center,
+                    color: Color::new(0.5, 0.5, 0.7, 1.0),
+                    ..Text::default()
+                };
+                frame.fill_text(text);
 
                 vec![frame.into_geometry()]
             },
