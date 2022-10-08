@@ -182,7 +182,7 @@ impl Application for SongSession {
     }
 
     fn subscription(&self) -> Subscription<Message> {
-        time::every(Duration::from_millis(10)).map(|_| Message::Tick)
+        time::every(Duration::from_millis(33)).map(|_| Message::Tick)
     }
 }
 
@@ -264,5 +264,5 @@ fn note_path(note: Note, length: u32) -> Path {
 }
 
 fn note_to_frame_transform(point: Point) -> Point {
-    Point::new(point.x / 20.0, 100.0 - 5.0 * point.y)
+    Point::new(point.x * 0.5, 100.0 - 5.0 * point.y)
 }
