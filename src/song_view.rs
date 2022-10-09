@@ -1,6 +1,6 @@
 use std::path::Path;
-use crate::song::Song;
-use crate::song::SelectMode;
+use crate::track::Track;
+use crate::track::SelectMode;
 use crate::note::Note;
 use cursive::{
 	Printer,
@@ -12,19 +12,19 @@ use cursive::{
 	traits::Resizable,
 };
 
-pub struct SongView {
-	song: Song,
+pub struct TrackView {
+	track: Track,
 }
 
-impl SongView {
-	pub fn new(song: Song) -> SongView {
-		SongView {
-			song,
+impl TrackView {
+	pub fn new(track: Track) -> TrackView {
+		TrackView {
+			track,
 		}
 	}
 }
 
-impl cursive::view::View for SongView {
+impl cursive::view::View for TrackView {
 	fn draw(&self, printer: &Printer) {
 		let mut y: u32 = 0;
 		let bg_color = ColorStyle::new(BaseColor::White.dark(), BaseColor::Black.light());
@@ -32,9 +32,10 @@ impl cursive::view::View for SongView {
 		let voice_color_focus = ColorStyle::new(BaseColor::White.dark(), BaseColor::Blue.dark());
 		let rest_color = ColorStyle::new(BaseColor::White.dark(), BaseColor::Magenta.dark());
 		let rest_color_focus = ColorStyle::new(BaseColor::White.dark(), BaseColor::Magenta.dark());
+		let track = &self.track;
 
-		for p in 0..self.song.phrases.len() {
-			let phrase = &self.song.phrases[p];
+		for p in 0..track.phrases.len() {
+			let phrase = &track.phrases[p];
 			let mut x: u32 = 0;
 
 			//draw measure markers
@@ -54,7 +55,7 @@ impl cursive::view::View for SongView {
 			for n in 0..phrase.len() {
 				let note = &phrase[n];
 				let note_y = y + (11 - note.pitch % 12) as u32;
-				if self.song.in_selection((p, n)) {
+				if track.in_selection((p, n)) {
 					printer.with_color(
 						bg_color,
 						|printer| {
@@ -64,7 +65,7 @@ impl cursive::view::View for SongView {
 						},
 					);
 				}
-				let color = if self.song.in_selection((p, n)) {
+				let color = if track.in_selection((p, n)) {
 					if note.voiced {
 						voice_color_focus
 					} else {
@@ -93,7 +94,8 @@ impl cursive::view::View for SongView {
 	}
 
 	fn important_area(&self, _view_size: XY<usize>) -> Rect {
-		let selection = self.song.get_selection_bounds();
+	    let track = &self.track;
+		let selection = track.get_selection_bounds();
 		let start = selection.0;
 		let end = selection.1;
 		let corner1 = (start.1 * 8, start.0 * 12);
@@ -102,70 +104,71 @@ impl cursive::view::View for SongView {
 	}
 
 	fn on_event(&mut self, event: Event) -> EventResult {
+	    let track = &mut self.track;
 		match event {
 			Event::CtrlChar('s') => {
-				self.song.write(Path::new("test.song"));
+				track.write(Path::new("test.song"));
 			}
 			Event::Key(Key::Left) => {
-				self.song.select_prev(1);
+				track.select_prev(1);
 			}
 			Event::Key(Key::Right) => {
-				self.song.select_next(1);
+				track.select_next(1);
 			}
 			Event::Key(Key::Up) => {
-				match self.song.select_mode {
+				match track.select_mode {
 					SelectMode::Note => {
-						self.song.toggle_selection_mode();
-						self.song.select_prev(1);
-						self.song.toggle_selection_mode();
+						track.toggle_selection_mode();
+						track.select_prev(1);
+						track.toggle_selection_mode();
 					}
 					SelectMode::Phrase => {
-						self.song.select_prev(1);
+						track.select_prev(1);
 					}
 				}
 			}
 			Event::Key(Key::Down) => {
-				match self.song.select_mode {
+				match track.select_mode {
 					SelectMode::Note => {
-						self.song.toggle_selection_mode();
-						self.song.select_next(1);
-						self.song.toggle_selection_mode();
+						track.toggle_selection_mode();
+						track.select_next(1);
+						track.toggle_selection_mode();
 					}
 					SelectMode::Phrase => {
-						self.song.select_next(1);
+						track.select_next(1);
 					}
 				}
 			}
 			Event::Shift(Key::Left) => {
-				self.song.contract_selection();
+				track.contract_selection();
 			}
 			Event::Shift(Key::Right) => {
-				self.song.extend_selection();
+				track.extend_selection();
 			}
 			Event::Char('[') => {
-				self.song.change_pitch(-1);
+				track.change_pitch(-1);
 			}
 			Event::Char(']') => {
-				self.song.change_pitch(1);
+				track.change_pitch(1);
 			}
 			Event::Char('n') => {
-				self.song.resize_note(-1);
+				track.resize_note(-1);
 			}
 			Event::Char('m') => {
-				self.song.resize_note(1);
+				track.resize_note(1);
 			}
 			Event::Char('t') => {
-				self.song.toggle_voiced();
+				track.toggle_voiced();
 			}
 			Event::Char('v') => {
-				self.song.toggle_selection_mode();
+				track.toggle_selection_mode();
 			}
 			Event::Char('e') => {
 				return EventResult::with_cb(|s| {
 					s.add_layer(
 						views::EditView::new().on_submit(|s, l| {
-							s.call_on_name("view", |v: &mut SongView| {
-								v.song.change_lyrics(&l);
+							s.call_on_name("view", |v: &mut TrackView| {
+								v.track.change_lyrics(&l);
 							});
 							s.pop_layer();
 						}).fixed_width(20)
@@ -174,11 +177,11 @@ impl cursive::view::View for SongView {
 			}
 			Event::Char('a') => {
 				let note = Note::new(8, 70, true, "".to_string());
-				self.song.add_after(note);
+				track.add_after(note);
 			}
 			Event::Char('i') => {
 				let note = Note::new(8, 70, true, "".to_string());
-				self.song.add_before(note);
+				track.add_before(note);
 			}
 			_ => {
 				return EventResult::Ignored;
@@ -188,7 +191,7 @@ impl cursive::view::View for SongView {
 	}
 
 	fn required_size(&mut self, _constraint: XY<usize>) -> XY<usize> {
-		return XY::new(200, 12 * self.song.phrases.len());
+		return XY::new(200, 12 * self.track.phrases.len());
 	}
 
 }

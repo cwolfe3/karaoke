@@ -5,6 +5,7 @@ mod song;
 mod song_view;
 mod mic;
 mod song_panel;
+mod track;
 
 //use std::path::Path;
 //use song::Song;
