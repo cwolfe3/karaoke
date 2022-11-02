@@ -26,4 +26,8 @@ impl Song {
     pub fn add_track(&mut self, name: String, track: Track) {
         self.tracks.insert(name, track);
     }
+
+    pub fn num_tracks(&self) -> usize {
+        self.tracks.len()
+    }
 }

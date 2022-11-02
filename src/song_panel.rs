@@ -1,13 +1,13 @@
 use std::time::{Instant, Duration};
 use cpal::traits::HostTrait;
+use iced::Theme;
 use iced::time;
 use iced::executor;
-use iced::widget::canvas::{self, Canvas, Geometry, Cursor, Frame, Path, Stroke, Text};
+use iced::widget::canvas::{Canvas, Geometry, Cursor, Frame, Path, Stroke, Text};
 use iced::alignment::Horizontal;
 use iced::{
     Application,
     Command,
-    Column,
     Element,
     Length,
     Rectangle,
@@ -15,6 +15,10 @@ use iced::{
     Settings,
     Point,
     Subscription,
+};
+use iced::widget::{
+    column,
+    canvas,
 };
 
 use crate::song::Song;
@@ -44,8 +48,9 @@ struct TrackSession {
     chunk_index: usize,
 }
 #[derive(Debug)]
+
 enum Message {
-    Tick
+    Tick,
 }
 
 enum State {
@@ -154,6 +159,7 @@ impl Application for TrackSession {
     type Message = Message;
     type Executor = executor::Default;
     type Flags = ();
+    type Theme = Theme;
 
     fn new(_flags: ()) -> (Self, Command<Message>) {
         (
@@ -175,8 +181,8 @@ impl Application for TrackSession {
         Command::none()
     }
 
-    fn view(&mut self) -> Element<Self::Message> {
-        Column::new().push(
+    fn view(&self) -> Element<Self::Message> {
+        column![].push(
             Canvas::new(self)
             .width(Length::Fill)
             .height(Length::Fill)
@@ -189,7 +195,15 @@ impl Application for TrackSession {
 }
 
 impl canvas::Program<Message> for TrackSession {
-    fn draw(&self, bounds: Rectangle, _cursor: Cursor) -> Vec<Geometry> {
+    type State = ();
+
+    fn draw(
+        &self,
+        _state: &Self::State,
+        _theme: &Theme,
+        bounds: Rectangle, 
+        _cursor: Cursor
+    ) -> Vec<Geometry> {
         match self.state {
             State::Playing => {
                 let backing_stroke = Stroke {

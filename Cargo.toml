@@ -7,8 +7,10 @@ edition = "2021"
 
 [dependencies]
 cursive = "0.16"
-cpal = "0.13"
+cpal = "0.14"
 ringbuf = "0.2"
 rustfft = "6.0.0"
 futures = "0.3.24"
-iced = { version = "0.4.2", features = ["canvas", "tokio"]}
+iced = { git = "https://github.com/iced-rs/iced", features = ["canvas", "tokio"]}
+iced_native = {git = "https://github.com/iced-rs/iced" }
+iced_core = {git = "https://github.com/iced-rs/iced" }
