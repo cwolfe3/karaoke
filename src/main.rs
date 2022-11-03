@@ -1,36 +1,14 @@
 //use std::env;
 
+mod mic;
 mod note;
 mod song;
-mod song_view;
-mod mic;
-mod song_panel;
-mod track;
 mod song_library;
+mod song_panel;
+mod song_view;
+mod track;
 
-use std::time::Duration;
-use iced::time;
-use iced::executor;
-use iced::Theme;
-use iced::{
-    Application,
-    Command,
-    Element,
-    Length,
-    Settings,
-    Subscription,
-};
-
-use iced::widget::{
-    scrollable,
-    button,
-    container,
-    text,
-};
-
-use iced_native::Event;
-use iced_native::keyboard::Event as kbEvent;
-use iced_native::keyboard::KeyCode;
+use eframe::egui;
 
 use crate::song_library::SongLibrary;
 //use std::path::Path;
@@ -42,6 +20,9 @@ use crate::song_library::SongLibrary;
 struct Karaoke {
     state: KaraokeState,
     library: SongLibrary,
+    scroll_position: f32, // This is used to calculate the scrollbar
+                          // offset. It approaches library.selection_index
+                          // every tick.
 }
 
 enum KaraokeState {
@@ -63,129 +44,135 @@ enum Message {
     None,
 }
 
-impl Application for Karaoke {
-    type Message = Message;
-    type Executor = executor::Default;
-    type Flags = ();
-    type Theme = Theme;
-
-    fn new(_flags: ()) -> (Self, Command<Message>) {
+impl Karaoke {
+    fn new(cc: &eframe::CreationContext<'_>) -> Self {
         let library = SongLibrary::read_songs(std::path::Path::new("songs"));
-        (
         Karaoke {
             state: KaraokeState::Library,
             library,
-        },
-        Command::none()
-        )
+            scroll_position: 0.0,
+        }
     }
 
     fn title(&self) -> String {
         String::from("Karaoke")
     }
 
-    fn update(&mut self, message: Message) -> Command<Message> {
+    fn handle_message(&mut self, message: Message) {
         match message {
             Message::FocusUp => {
                 self.library.select_previous();
-            },
+            }
             Message::FocusDown => {
                 self.library.select_next();
-            },
-            Message::Focus(_) => (),
-            Message::SelectFocused => {
-                
-            },
+            }
+            Message::Focus(i) => self.library.select(i),
+            Message::SelectFocused => {}
             Message::Play => (),
             Message::Pause => (),
             Message::Resume => (),
-            Message::Tick => (),
+            Message::Tick => self.tick(),
             Message::None => (),
         }
-        Command::none()
     }
 
-    fn view(&self) -> Element<Self::Message> {
-        println!("VIEW CALLED");
-        match &self.state {
-            KaraokeState::Library => {
-                let mut list = iced::widget::column![];
-                // TODO why does this have to be mutable?
-                for (i, song) in &mut self.library.songs[..].iter().enumerate() {
-                    let mut song_option = button(text(song.name.clone()))
-                        .width(Length::Fill)
-                        .height(Length::Fill)
-                        .on_press(Message::None); // To trick it to be a bright color
-                    if i == self.library.selection_index {    
-                        song_option = song_option.style(iced::theme::Button::Primary);
-                    } else {
-                        song_option = song_option.style(iced::theme::Button::Secondary);
-                    }
-                    let song_option = container(song_option)
-                        .width(Length::FillPortion(65))
-                        .height(Length::Units(150));
-                    list = list.push(song_option); 
-                }
-                let scrollable = scrollable(list);
-                iced::widget::row!()
-                    .push(container(scrollable).width(Length::FillPortion(65)))
-                    .push(iced::widget::column![]
-                          .push(text("SONG_DETAILS"))
-                          .width(Length::FillPortion(35)))
-                    .into()
-            },
-            KaraokeState::Playing => {
-                text("Playing").into()
-            },
-            KaraokeState::Paused => {
-                text("Playing").into()
-            }
-        }
+    fn tick(&mut self) {
+        self.update_scroll_position();
     }
 
-    fn subscription(&self) -> Subscription<Message> {
-        let event_sub = iced_native::subscription::events().map(
-            |event| {
-                match event {
-                    Event::Mouse(_) => Message::None,
-                    Event::Window(_) => Message::None,
-                    Event::Touch(_) => Message::None,
-                    Event::Keyboard(key_event) => {
-                        match key_event {
-                            kbEvent::KeyPressed { key_code, modifiers } => {
-                                match key_code {
-                                    KeyCode::Up => {
-                                        Message::FocusUp
-                                    },
-                                    KeyCode::Down => {
-                                        Message::FocusDown
-                                    }
-                                    _ => Message::None,
-                                }
-                            }
-                            kbEvent::KeyReleased { key_code, modifiers } => Message::None,
-                            kbEvent::CharacterReceived(_) => Message::None,
-                            kbEvent::ModifiersChanged(_) => Message::None,
-                        }
-                    },
-                    Event::PlatformSpecific(_) => Message::None,
+    fn update_scroll_position(&mut self) {
+        let difference = self.library.selection_index as f32 - self.scroll_position;
+        self.scroll_position += difference / 10.0;
+    }
+}
+
+impl eframe::App for Karaoke {
+    fn update(&mut self, ctx: &egui::Context, frame: &mut eframe::Frame) {
+        self.handle_message(Message::Tick);
+        let screen_width = ctx.input().screen_rect().width();
+        let screen_height = ctx.input().screen_rect().height();
+        egui::CentralPanel::default().show(ctx, |ui| {
+            match &self.state {
+                KaraokeState::Library => {
+                    ui.with_layout(
+                        egui::Layout::left_to_right(egui::Align::Min).with_cross_justify(true),
+                        |ui| {
+                            let w = screen_width * 0.5;
+                            let h = screen_height * 0.166;
+                            egui::ScrollArea::vertical()
+                                .auto_shrink([true, true])
+                                .vertical_scroll_offset(
+                                    convert_scroll_position(
+                                        self.scroll_position,
+                                        h + ui.spacing().item_spacing.y,
+                                    ) - screen_height / 2.0,
+                                )
+                                .show(ui, |ui| {
+                                    ui.with_layout(egui::Layout::top_down(egui::Align::Min), |ui| {
+                                        // let mut selection = self.library.selection_index;
+                                        for (i, song) in self.library.songs[..].iter().enumerate() {
+                                            let mut button = egui::Button::new(song.name.clone());
+                                            if self.library.selection_index == i {
+                                                button = button.stroke(
+                                                    ctx.style().visuals.widgets.hovered.fg_stroke,
+                                                );
+                                                button = button.fill(
+                                                    ctx.style().visuals.widgets.hovered.bg_fill,
+                                                );
+                                            } else {
+                                                button = button.stroke(
+                                                    ctx.style().visuals.widgets.inactive.bg_stroke,
+                                                );
+                                                button = button.fill(
+                                                    ctx.style().visuals.widgets.inactive.bg_fill,
+                                                );
+                                            }
+                                            ui.add_sized([w, h], button);
+                                        }
+                                    })
+                                });
+                            ui.separator();
+                            ui.label("SONG_INFORMATION");
+                            ctx.request_repaint();
+                        },
+                    )
                 }
+                KaraokeState::Playing => egui::Frame::none().show(ui, |ui| {
+                    ui.label("Playing");
+                }),
+                KaraokeState::Paused => egui::Frame::none().show(ui, |ui| {
+                    ui.label("Paused");
+                }),
             }
-        );
-        let tick_sub = time::every(Duration::from_millis(33)).map(|_| Message::Tick);
-        Subscription::batch([event_sub, tick_sub])
+        });
+        handle_input(self, ctx);
+    }
+}
+
+fn convert_scroll_position(scroll_position: f32, item_size: f32) -> f32 {
+    (scroll_position + 0.5) * item_size as f32
+}
+
+fn handle_input(karaoke: &mut Karaoke, ctx: &egui::Context) {
+    if ctx.input().key_pressed(egui::Key::ArrowDown) {
+        karaoke.handle_message(Message::FocusDown);
+    }
+    if ctx.input().key_pressed(egui::Key::ArrowUp) {
+        karaoke.handle_message(Message::FocusUp);
     }
 }
 
 fn main() {
-    Karaoke::run(Settings {
-        antialiasing: true,
-        ..Settings::default()
-    });
-	//let song = Song::read(Path::new("test.song"));
+    let native_options = eframe::NativeOptions::default();
+    eframe::run_native(
+        "Karaoke",
+        native_options,
+        Box::new(|cc| Box::new(Karaoke::new(cc))),
+    )
+    //let song = Song::read(Path::new("test.song"));
 
-	//let mut siv = cursive::default();
-	//siv.add_global_callback('q', |s| s.quit());
-	//siv.add_layer(views::ScrollView::new(SongView::new(song).with_name("view")).scroll_x(true));
-	//siv.run();
+    //let mut siv = cursive::default();
+    //siv.add_global_callback('q', |s| s.quit());
+    //siv.add_layer(views::ScrollView::new(SongView::new(song).with_name("view")).scroll_x(true));
+    //siv.run();
 }

@@ -11,6 +11,4 @@ cpal = "0.14"
 ringbuf = "0.2"
 rustfft = "6.0.0"
 futures = "0.3.24"
-iced = { git = "https://github.com/iced-rs/iced", features = ["canvas", "tokio"]}
-iced_native = {git = "https://github.com/iced-rs/iced" }
-iced_core = {git = "https://github.com/iced-rs/iced" }
+eframe = "0.19"

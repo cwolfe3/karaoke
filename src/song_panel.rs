@@ -1,38 +1,10 @@
 use std::time::{Instant, Duration};
 use cpal::traits::HostTrait;
-use iced::Theme;
-use iced::time;
-use iced::executor;
-use iced::widget::canvas::{Canvas, Geometry, Cursor, Frame, Path, Stroke, Text};
-use iced::alignment::Horizontal;
-use iced::{
-    Application,
-    Command,
-    Element,
-    Length,
-    Rectangle,
-    Color,
-    Settings,
-    Point,
-    Subscription,
-};
-use iced::widget::{
-    column,
-    canvas,
-};
 
 use crate::song::Song;
 use crate::track::Track;
 use crate::mic::Microphone;
 use crate::note::Note;
-
-
-pub fn main() -> iced::Result {
-    TrackSession::run(Settings {
-        antialiasing: true,
-        ..Settings::default()
-    })
-}
 
 struct TrackSession {
     backing_track: Track,
@@ -153,146 +125,122 @@ impl TrackSession {
             chunk_index: 0,
         })
     }
-}
 
-impl Application for TrackSession {
-    type Message = Message;
-    type Executor = executor::Default;
-    type Flags = ();
-    type Theme = Theme;
-
-    fn new(_flags: ()) -> (Self, Command<Message>) {
-        (
-            TrackSession::new(Track::read(std::path::Path::new("songs/test1/test.track"))).unwrap(),
-            Command::none(),
-            )
-    }
-
-    fn title(&self) -> String {
-        String::from("sdfsdf")
-    }
-
-    fn update(&mut self, message: Message) -> Command<Message> {
+    fn update(&mut self, message: Message) {
         match message {
             Message::Tick => {
                 self.tick();
             }
         }
-        Command::none()
     }
 
-    fn view(&self) -> Element<Self::Message> {
-        column![].push(
-            Canvas::new(self)
-            .width(Length::Fill)
-            .height(Length::Fill)
-            ).into()
+    fn view(&self)  {
+        // column![].push(
+        //     Canvas::new(self)
+        //     .width(Length::Fill)
+        //     .height(Length::Fill)
+        //     ).into()
     }
 
-    fn subscription(&self) -> Subscription<Message> {
-        time::every(Duration::from_millis(33)).map(|_| Message::Tick)
-    }
 }
 
-impl canvas::Program<Message> for TrackSession {
-    type State = ();
+// impl canvas::Program<Message> for TrackSession {
+//     type State = ();
 
-    fn draw(
-        &self,
-        _state: &Self::State,
-        _theme: &Theme,
-        bounds: Rectangle, 
-        _cursor: Cursor
-    ) -> Vec<Geometry> {
-        match self.state {
-            State::Playing => {
-                let backing_stroke = Stroke {
-                    color: Color::new(0.5, 0.5, 0.5, 1.0),
-                    width: 5.0,
-                    ..Stroke::default()
-                };
-                let player_stroke = Stroke {
-                    color: Color::new(0.0, 0.2, 1.0, 1.0),
-                    width: 5.0,
-                    ..Stroke::default()
-                };
-                let rest_stroke = Stroke {
-                    color: Color::new(0.9, 0.9, 0.9, 1.0),
-                    width: 5.0,
-                    ..Stroke::default()
-                };
-                let mut frame = Frame::new(bounds.size()); 
+//     fn draw(
+//         &self,
+//         _state: &Self::State,
+//         _theme: &Theme,
+//         bounds: Rectangle, 
+//         _cursor: Cursor
+//     ) -> Vec<Geometry> {
+//         match self.state {
+//             State::Playing => {
+//                 let backing_stroke = Stroke {
+//                     color: Color::new(0.5, 0.5, 0.5, 1.0),
+//                     width: 5.0,
+//                     ..Stroke::default()
+//                 };
+//                 let player_stroke = Stroke {
+//                     color: Color::new(0.0, 0.2, 1.0, 1.0),
+//                     width: 5.0,
+//                     ..Stroke::default()
+//                 };
+//                 let rest_stroke = Stroke {
+//                     color: Color::new(0.9, 0.9, 0.9, 1.0),
+//                     width: 5.0,
+//                     ..Stroke::default()
+//                 };
+//                 let mut frame = Frame::new(bounds.size()); 
 
-                let backing_phrase = &self.backing_track.phrases[self.phrase_index];
-                let mut length = 0;
-                for (index, note) in backing_phrase.iter().enumerate() {
-                    let path = note_path(note.clone(), length);
+//                 let backing_phrase = &self.backing_track.phrases[self.phrase_index];
+//                 let mut length = 0;
+//                 for (index, note) in backing_phrase.iter().enumerate() {
+//                     let path = note_path(note.clone(), length);
 
-                    length += note.length;
-                    if note.voiced {
-                        frame.stroke(&path, backing_stroke);
-                    } else {
-                        frame.stroke(&path, rest_stroke);
-                    }
-                }
+//                     length += note.length;
+//                     if note.voiced {
+//                         frame.stroke(&path, backing_stroke);
+//                     } else {
+//                         frame.stroke(&path, rest_stroke);
+//                     }
+//                 }
 
-                let singing_phrase = &self.track.phrases.get(self.phrase_index);
-                match singing_phrase {
-                    Some(phrase) => {
-                        let mut length = 0;
-                        for note in *phrase {
-                            let path = note_path(note.clone(), length);
-                            length += note.length;
-                            if note.voiced {
-                                frame.stroke(&path, player_stroke);
-                            } else {
-                                frame.stroke(&path, rest_stroke);
-                            }
-                        }
-                    },
-                    None => ()
-                }
+//                 let singing_phrase = &self.track.phrases.get(self.phrase_index);
+//                 match singing_phrase {
+//                     Some(phrase) => {
+//                         let mut length = 0;
+//                         for note in *phrase {
+//                             let path = note_path(note.clone(), length);
+//                             length += note.length;
+//                             if note.voiced {
+//                                 frame.stroke(&path, player_stroke);
+//                             } else {
+//                                 frame.stroke(&path, rest_stroke);
+//                             }
+//                         }
+//                     },
+//                     None => ()
+//                 }
                 
-                let lyrics : Vec<String> = backing_phrase.iter().map(|x| x.lyric.clone()).collect();
-                let lyrics = lyrics.join(" ");
-                let width = bounds.width;
+//                 let lyrics : Vec<String> = backing_phrase.iter().map(|x| x.lyric.clone()).collect();
+//                 let lyrics = lyrics.join(" ");
+//                 let width = bounds.width;
 
-                let text = Text {
-                    content: lyrics,
-                    position: Point {x: width / 2.0, y: 0.0},
-                    horizontal_alignment: Horizontal::Center,
-                    color: Color::new(0.5, 0.5, 0.7, 1.0),
-                    ..Text::default()
-                };
-                frame.fill_text(text);
+//                 let text = Text {
+//                     content: lyrics,
+//                     position: Point {x: width / 2.0, y: 0.0},
+//                     horizontal_alignment: Horizontal::Center,
+//                     color: Color::new(0.5, 0.5, 0.7, 1.0),
+//                     ..Text::default()
+//                 };
+//                 frame.fill_text(text);
 
-                vec![frame.into_geometry()]
-            },
-            State::Paused => {
-                Vec::new()
-            },
-            State::Finished => {
-                Vec::new()
-            }
-        }
-    }
-}
+//                 vec![frame.into_geometry()]
+//             },
+//             State::Paused => {
+//                 Vec::new()
+//             },
+//             State::Finished => {
+//                 Vec::new()
+//             }
+//         }
+//     }
 
-impl TrackSession {
-    fn draw_phrase(&self, frame: Frame, _cursor: Cursor) -> Vec<Geometry> {
-        unimplemented!();
-    }
-}
+//     fn draw_phrase(&self, frame: Frame, _cursor: Cursor) -> Vec<Geometry> {
+//         unimplemented!();
+//     }
+// }
 
-fn note_path(note: Note, length: u32) -> Path {
-    let y = (((note.pitch % 12) + 12) % 12) as f32;
-    let x = length as f32;
-    Path::line(
-        note_to_frame_transform(Point::new(x, y)),
-        note_to_frame_transform(Point::new(x + (note.length as f32), y))
-        )
-}
+// fn note_path(note: Note, length: u32) -> Path {
+//     let y = (((note.pitch % 12) + 12) % 12) as f32;
+//     let x = length as f32;
+//     Path::line(
+//         note_to_frame_transform(Point::new(x, y)),
+//         note_to_frame_transform(Point::new(x + (note.length as f32), y))
+//         )
+// }
 
-fn note_to_frame_transform(point: Point) -> Point {
-    Point::new(point.x * 0.5, 100.0 - 5.0 * point.y)
-}
+// fn note_to_frame_transform(point: Point) -> Point {
+//     Point::new(point.x * 0.5, 100.0 - 5.0 * point.y)
+// }

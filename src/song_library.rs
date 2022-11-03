@@ -82,4 +82,12 @@ impl SongLibrary {
             self.selection_index = self.songs.len() - 1;
         }
     }
+
+    pub fn select(&mut self, i: usize) {
+        if i >= self.songs.len() {
+            self.selection_index = self.songs.len() - 1;
+        } else {
+            self.selection_index = i;
+        }
+    }
 }
