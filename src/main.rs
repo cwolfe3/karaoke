@@ -191,6 +191,9 @@ fn handle_input(karaoke: &mut Karaoke, ctx: &egui::Context) {
     if ctx.input().key_pressed(egui::Key::ArrowUp) {
         karaoke.handle_message(Message::FocusUp);
     }
+    if ctx.input().key_pressed(egui::Key::Enter) {
+        karaoke.handle_message(Message::SelectFocused);
+    }
 }
 
 fn main() {
