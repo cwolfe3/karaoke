@@ -95,7 +95,16 @@ impl Karaoke {
                 self.update_scroll_position();
             }
             KaraokeState::Playing => match &mut self.session {
-                Some(session) => session.tick(),
+                Some(session) => {
+                    session.tick();
+                    match session.state {
+                        song_panel::State::Playing => (),
+                        song_panel::State::Paused => (),
+                        song_panel::State::Finished => {
+                            self.state = KaraokeState::Library;
+                        }
+                    };
+                }
                 None => (),
             },
             KaraokeState::Paused => todo!(),

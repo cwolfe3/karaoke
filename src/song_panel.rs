@@ -12,7 +12,7 @@ pub struct TrackSession {
     backing_track: Track,
     mic: Microphone,
     track: Track,
-    state: State,
+    pub state: State,
     elapsed_time: Duration,
     elapsed_time_goal: Duration,
     last_update_time: Instant,
@@ -28,7 +28,7 @@ enum Message {
     Tick,
 }
 
-enum State {
+pub enum State {
     Playing,
     Paused,
     Finished,
@@ -61,6 +61,11 @@ impl TrackSession {
         })
     }
 
+    fn finish(&mut self) {
+        self.mic.pause();
+        self.state = State::Finished;
+    }
+
     fn next_chunk(&mut self) {
         self.chunk_index += 1;
         if self.chunk_index >= self.chunk_lengths.len() {
@@ -70,7 +75,7 @@ impl TrackSession {
                 self.note_index = 0;
                 self.phrase_index += 1;
                 if self.phrase_index >= self.backing_track.phrases.len() {
-                    self.state = State::Finished;
+                    self.finish();
                     return;
                 }
             }
@@ -106,7 +111,6 @@ impl TrackSession {
                 while self.ready() {
                     let current_phrase = self.backing_track.get_phrase(self.phrase_index);
 
-                    //Check if end of song has been reached
                     match current_phrase {
                         Some(phrase) => {
                             let current_note = &phrase[self.note_index];
@@ -123,7 +127,7 @@ impl TrackSession {
                                 self.chunk_lengths[self.chunk_index].into(),
                             ))
                         }
-                        None => (),
+                        None => break,
                     }
                 }
             }
