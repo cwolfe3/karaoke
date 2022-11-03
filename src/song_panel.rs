@@ -1,12 +1,14 @@
-use std::time::{Instant, Duration};
 use cpal::traits::HostTrait;
+use eframe::egui::{self, epaint};
+use std::sync::Arc;
+use std::time::{Duration, Instant};
 
-use crate::song::Song;
-use crate::track::Track;
 use crate::mic::Microphone;
 use crate::note::Note;
+use crate::song::Song;
+use crate::track::Track;
 
-struct TrackSession {
+pub struct TrackSession {
     backing_track: Track,
     mic: Microphone,
     track: Track,
@@ -18,8 +20,9 @@ struct TrackSession {
     note_index: usize,
     chunk_lengths: Vec<u32>,
     chunk_index: usize,
+
+    font_id: epaint::text::FontId,
 }
-#[derive(Debug)]
 
 enum Message {
     Tick,
@@ -28,10 +31,36 @@ enum Message {
 enum State {
     Playing,
     Paused,
-    Finished
+    Finished,
 }
 
 impl TrackSession {
+    pub fn new(backing_track: Track) -> Option<TrackSession> {
+        if backing_track.phrases.is_empty() || backing_track.phrases.get(0)?.is_empty() {
+            return None;
+        }
+        let initial_note = backing_track.get_phrase(0).unwrap().get(0).unwrap();
+        let initial_note_length = initial_note.length;
+        Some(TrackSession {
+            backing_track,
+            mic: Microphone::new(cpal::default_host().default_output_device().expect("")),
+            track: Track::new(),
+            state: State::Playing,
+            elapsed_time: Duration::ZERO,
+            elapsed_time_goal: Duration::ZERO,
+            last_update_time: Instant::now(),
+            phrase_index: 0,
+            note_index: 0,
+            chunk_lengths: Self::split_into_chunks(initial_note_length),
+            chunk_index: 0,
+
+            font_id: epaint::text::FontId {
+                size: 16.0,
+                family: epaint::FontFamily::Proportional,
+            },
+        })
+    }
+
     fn next_chunk(&mut self) {
         self.chunk_index += 1;
         if self.chunk_index >= self.chunk_lengths.len() {
@@ -66,10 +95,12 @@ impl TrackSession {
         return vec;
     }
 
-    fn tick(&mut self) {
+    pub fn tick(&mut self) {
         match self.state {
             State::Playing => {
-                self.elapsed_time_goal = self.elapsed_time_goal.saturating_add(self.last_update_time.elapsed());
+                self.elapsed_time_goal = self
+                    .elapsed_time_goal
+                    .saturating_add(self.last_update_time.elapsed());
                 self.last_update_time = Instant::now();
 
                 while self.ready() {
@@ -88,42 +119,19 @@ impl TrackSession {
                             self.track.phrases[self.phrase_index].push(sung_note);
 
                             self.next_chunk();
-                            self.mic.set_window_length(Duration::from_millis(self.chunk_lengths[self.chunk_index].into()))
-                        },
+                            self.mic.set_window_length(Duration::from_millis(
+                                self.chunk_lengths[self.chunk_index].into(),
+                            ))
+                        }
                         None => (),
                     }
-
                 }
-            },
+            }
             State::Paused => {
                 self.last_update_time = Instant::now();
-            },
-            State::Finished => {
-
             }
+            State::Finished => {}
         }
-    }
-
-    fn new(backing_track: Track) -> Option<TrackSession> {
-        if backing_track.phrases.is_empty()
-            || backing_track.phrases.get(0)?.is_empty() {
-            return None
-        }
-        let initial_note = backing_track.get_phrase(0).unwrap().get(0).unwrap();
-        let initial_note_length = initial_note.length;
-        Some(TrackSession {
-            backing_track,
-            mic: Microphone::new(cpal::default_host().default_output_device().expect("")),
-            track: Track::new(),
-            state: State::Playing,
-            elapsed_time: Duration::ZERO,
-            elapsed_time_goal: Duration::ZERO,
-            last_update_time: Instant::now(),
-            phrase_index: 0,
-            note_index: 0,
-            chunk_lengths: Self::split_into_chunks(initial_note_length),
-            chunk_index: 0,
-        })
     }
 
     fn update(&mut self, message: Message) {
@@ -134,113 +142,118 @@ impl TrackSession {
         }
     }
 
-    fn view(&self)  {
-        // column![].push(
-        //     Canvas::new(self)
-        //     .width(Length::Fill)
-        //     .height(Length::Fill)
-        //     ).into()
-    }
+    pub fn draw(&self, ui: &mut egui::Ui) -> egui::Response {
+        let (mut response, painter) =
+            ui.allocate_painter(ui.available_size(), egui::Sense::focusable_noninteractive());
 
+        let to_screen = egui::emath::RectTransform::from_to(
+            egui::Rect::from_min_size(egui::Pos2::ZERO, response.rect.square_proportions()),
+            response.rect,
+        );
+        let from_screen = to_screen.inverse();
+
+        let mut shapes = vec![];
+        let backing_phrase = &self.backing_track.phrases[self.phrase_index];
+        let mut length = 0;
+
+        let backing_stroke = epaint::Stroke::new(4.0, epaint::color::Color32::GRAY);
+        let rest_stroke = epaint::Stroke::new(4.0, epaint::color::Color32::WHITE);
+        let player_stroke = epaint::Stroke::new(4.0, epaint::color::Color32::BLUE);
+
+        for (index, note) in backing_phrase.iter().enumerate() {
+            let path = note_path(note.clone(), length)
+                .iter()
+                .map(|(x, y)| egui::Pos2 { x: *x, y: *y })
+                .collect();
+
+            length += note.length;
+            if note.voiced {
+                shapes.push(egui::Shape::line(path, backing_stroke));
+            } else {
+                shapes.push(egui::Shape::line(path, rest_stroke));
+            }
+        }
+
+        let singing_phrase = &self.track.phrases.get(self.phrase_index);
+        match singing_phrase {
+            Some(phrase) => {
+                let mut length = 0;
+                for note in *phrase {
+                    let path = note_path(note.clone(), length)
+                        .iter()
+                        .map(|(x, y)| egui::Pos2 { x: *x, y: *y })
+                        .collect();
+                    length += note.length;
+                    if note.voiced {
+                        shapes.push(egui::Shape::line(path, player_stroke));
+                    } else {
+                        shapes.push(egui::Shape::line(path, rest_stroke));
+                    }
+                }
+            }
+            None => (),
+        }
+
+        let mut lyrics: Vec<Arc<epaint::text::Galley>> = vec![];
+
+        for (i, note) in backing_phrase.iter().enumerate() {
+            if i == self.note_index {
+                lyrics.push(ui.fonts().layout_no_wrap(
+                    note.lyric.clone(),
+                    self.font_id.clone(),
+                    epaint::color::Color32::BLUE,
+                ));
+            } else {
+                lyrics.push(ui.fonts().layout_no_wrap(
+                    note.lyric.clone(),
+                    self.font_id.clone(),
+                    epaint::color::Color32::BLUE,
+                ));
+            }
+        }
+
+        let text_positions = set_text_in_line(egui::Pos2::ZERO, &lyrics);
+        let partial_shapes: Vec<(&egui::Pos2, &Arc<epaint::text::Galley>)> =
+            text_positions.iter().zip(lyrics.iter()).collect();
+        for (text_position, lyric) in partial_shapes.iter() {
+            shapes.push(egui::Shape::Text(epaint::TextShape {
+                pos: **text_position,
+                galley: (*lyric).clone(),
+                underline: epaint::Stroke::default(),
+                override_text_color: None,
+                angle: 0.0,
+            }));
+        }
+
+        painter.extend(shapes);
+        response
+    }
 }
 
-// impl canvas::Program<Message> for TrackSession {
-//     type State = ();
+fn set_text_in_line(pos: egui::Pos2, lyrics: &Vec<Arc<epaint::text::Galley>>) -> Vec<egui::Pos2> {
+    let mut current_pos = pos;
+    let mut resulting_positions = vec![];
+    resulting_positions.push(current_pos);
+    for lyric in lyrics {
+        current_pos = egui::Pos2 {
+            x: lyric.size().x,
+            y: pos.y,
+        };
+        resulting_positions.push(current_pos);
+    }
+    resulting_positions.pop();
+    resulting_positions
+}
 
-//     fn draw(
-//         &self,
-//         _state: &Self::State,
-//         _theme: &Theme,
-//         bounds: Rectangle, 
-//         _cursor: Cursor
-//     ) -> Vec<Geometry> {
-//         match self.state {
-//             State::Playing => {
-//                 let backing_stroke = Stroke {
-//                     color: Color::new(0.5, 0.5, 0.5, 1.0),
-//                     width: 5.0,
-//                     ..Stroke::default()
-//                 };
-//                 let player_stroke = Stroke {
-//                     color: Color::new(0.0, 0.2, 1.0, 1.0),
-//                     width: 5.0,
-//                     ..Stroke::default()
-//                 };
-//                 let rest_stroke = Stroke {
-//                     color: Color::new(0.9, 0.9, 0.9, 1.0),
-//                     width: 5.0,
-//                     ..Stroke::default()
-//                 };
-//                 let mut frame = Frame::new(bounds.size()); 
+fn note_path(note: Note, length: u32) -> Vec<(f32, f32)> {
+    let y = (((note.pitch % 12) + 12) % 12) as f32;
+    let x = length as f32;
+    let mut note_path = vec![];
+    note_path.push(note_to_frame_transform((x, y)));
+    note_path.push(note_to_frame_transform((x + (note.length as f32), y)));
+    note_path
+}
 
-//                 let backing_phrase = &self.backing_track.phrases[self.phrase_index];
-//                 let mut length = 0;
-//                 for (index, note) in backing_phrase.iter().enumerate() {
-//                     let path = note_path(note.clone(), length);
-
-//                     length += note.length;
-//                     if note.voiced {
-//                         frame.stroke(&path, backing_stroke);
-//                     } else {
-//                         frame.stroke(&path, rest_stroke);
-//                     }
-//                 }
-
-//                 let singing_phrase = &self.track.phrases.get(self.phrase_index);
-//                 match singing_phrase {
-//                     Some(phrase) => {
-//                         let mut length = 0;
-//                         for note in *phrase {
-//                             let path = note_path(note.clone(), length);
-//                             length += note.length;
-//                             if note.voiced {
-//                                 frame.stroke(&path, player_stroke);
-//                             } else {
-//                                 frame.stroke(&path, rest_stroke);
-//                             }
-//                         }
-//                     },
-//                     None => ()
-//                 }
-                
-//                 let lyrics : Vec<String> = backing_phrase.iter().map(|x| x.lyric.clone()).collect();
-//                 let lyrics = lyrics.join(" ");
-//                 let width = bounds.width;
-
-//                 let text = Text {
-//                     content: lyrics,
-//                     position: Point {x: width / 2.0, y: 0.0},
-//                     horizontal_alignment: Horizontal::Center,
-//                     color: Color::new(0.5, 0.5, 0.7, 1.0),
-//                     ..Text::default()
-//                 };
-//                 frame.fill_text(text);
-
-//                 vec![frame.into_geometry()]
-//             },
-//             State::Paused => {
-//                 Vec::new()
-//             },
-//             State::Finished => {
-//                 Vec::new()
-//             }
-//         }
-//     }
-
-//     fn draw_phrase(&self, frame: Frame, _cursor: Cursor) -> Vec<Geometry> {
-//         unimplemented!();
-//     }
-// }
-
-// fn note_path(note: Note, length: u32) -> Path {
-//     let y = (((note.pitch % 12) + 12) % 12) as f32;
-//     let x = length as f32;
-//     Path::line(
-//         note_to_frame_transform(Point::new(x, y)),
-//         note_to_frame_transform(Point::new(x + (note.length as f32), y))
-//         )
-// }
-
-// fn note_to_frame_transform(point: Point) -> Point {
-//     Point::new(point.x * 0.5, 100.0 - 5.0 * point.y)
-// }
+fn note_to_frame_transform((x, y): (f32, f32)) -> (f32, f32) {
+    (x * 0.5, 100.0 - 5.0 * y)
+}

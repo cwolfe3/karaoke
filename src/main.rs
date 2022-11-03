@@ -11,6 +11,7 @@ mod track;
 use eframe::egui;
 
 use crate::song_library::SongLibrary;
+use crate::song_panel::TrackSession;
 //use std::path::Path;
 //use song::Song;
 //use song_view::SongView;
@@ -20,6 +21,7 @@ use crate::song_library::SongLibrary;
 struct Karaoke {
     state: KaraokeState,
     library: SongLibrary,
+    session: Option<TrackSession>,
     scroll_position: f32, // This is used to calculate the scrollbar
                           // offset. It approaches library.selection_index
                           // every tick.
@@ -50,6 +52,7 @@ impl Karaoke {
         Karaoke {
             state: KaraokeState::Library,
             library,
+            session: None,
             scroll_position: 0.0,
         }
     }
@@ -67,7 +70,17 @@ impl Karaoke {
                 self.library.select_next();
             }
             Message::Focus(i) => self.library.select(i),
-            Message::SelectFocused => {}
+            Message::SelectFocused => {
+                self.state = KaraokeState::Playing;
+                let song = self
+                    .library
+                    .songs
+                    .get(self.library.selection_index)
+                    .unwrap();
+                let track1 = song.tracks.get("track 1").unwrap();
+                self.session = TrackSession::new(track1.clone());
+                println!("Selected");
+            }
             Message::Play => (),
             Message::Pause => (),
             Message::Resume => (),
@@ -77,7 +90,16 @@ impl Karaoke {
     }
 
     fn tick(&mut self) {
-        self.update_scroll_position();
+        match self.state {
+            KaraokeState::Library => {
+                self.update_scroll_position();
+            }
+            KaraokeState::Playing => match &mut self.session {
+                Some(session) => session.tick(),
+                None => (),
+            },
+            KaraokeState::Paused => todo!(),
+        }
     }
 
     fn update_scroll_position(&mut self) {
@@ -88,6 +110,7 @@ impl Karaoke {
 
 impl eframe::App for Karaoke {
     fn update(&mut self, ctx: &egui::Context, frame: &mut eframe::Frame) {
+        handle_input(self, ctx);
         self.handle_message(Message::Tick);
         let screen_width = ctx.input().screen_rect().width();
         let screen_height = ctx.input().screen_rect().height();
@@ -110,6 +133,7 @@ impl eframe::App for Karaoke {
                                 .show(ui, |ui| {
                                     ui.with_layout(egui::Layout::top_down(egui::Align::Min), |ui| {
                                         // let mut selection = self.library.selection_index;
+                                        let mut selected = false;
                                         for (i, song) in self.library.songs[..].iter().enumerate() {
                                             let mut button = egui::Button::new(song.name.clone());
                                             if self.library.selection_index == i {
@@ -127,25 +151,32 @@ impl eframe::App for Karaoke {
                                                     ctx.style().visuals.widgets.inactive.bg_fill,
                                                 );
                                             }
-                                            ui.add_sized([w, h], button);
+                                            if ui.add_sized([w, h], button).clicked() {
+                                                selected = true;
+                                            };
+                                        }
+                                        if selected {
+                                            self.handle_message(Message::SelectFocused);
                                         }
                                     })
                                 });
                             ui.separator();
                             ui.label("SONG_INFORMATION");
-                            ctx.request_repaint();
                         },
                     )
                 }
                 KaraokeState::Playing => egui::Frame::none().show(ui, |ui| {
-                    ui.label("Playing");
+                    egui::Frame::canvas(ui.style()).show(ui, |ui| match &self.session {
+                        Some(some_session) => some_session.draw(ui),
+                        None => ui.label("Unable to play"),
+                    });
                 }),
                 KaraokeState::Paused => egui::Frame::none().show(ui, |ui| {
                     ui.label("Paused");
                 }),
             }
         });
-        handle_input(self, ctx);
+        ctx.request_repaint();
     }
 }
 

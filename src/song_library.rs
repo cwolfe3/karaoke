@@ -1,5 +1,5 @@
+use std::fs::{DirEntry, File};
 use std::path::Path;
-use std::fs::{File, DirEntry};
 
 use crate::song::Song;
 use crate::track::Track;
@@ -23,24 +23,24 @@ impl SongLibrary {
                     match dir {
                         Ok(dir_entry_ok) => {
                             library.read_song(dir_entry_ok.path().as_path());
-                        },
+                        }
                         Err(_) => (),
                     }
                 }
                 library
-            },
-            Err(_) => {
-                library
             }
+            Err(_) => library,
         }
     }
 
     fn read_song(&mut self, path: &Path) {
-       match path.read_dir() {
-           Ok(dir_iter) => {
-                let mut song = Song::new("SONG NAME PLACEHOLDER".to_string(), 
-                                         "ARTIST NAME PLACEHOLDER".to_string(), 
-                                         "ALBUM NAME PLACEHOLDER".to_string());
+        match path.read_dir() {
+            Ok(dir_iter) => {
+                let mut song = Song::new(
+                    "SONG NAME PLACEHOLDER".to_string(),
+                    "ARTIST NAME PLACEHOLDER".to_string(),
+                    "ALBUM NAME PLACEHOLDER".to_string(),
+                );
                 for dir in dir_iter {
                     match dir {
                         Ok(dir_entry_ok) => {
@@ -52,19 +52,19 @@ impl SongLibrary {
                                         let track = Track::read(path.as_path());
                                         song.add_track("track 1".to_string(), track);
                                     }
-                                },
-                                None => ()
+                                }
+                                None => (),
                             }
-                        },
-                        Err(_) => return ()
+                        }
+                        Err(_) => return (),
                     }
                 }
                 if song.num_tracks() > 0 {
                     self.songs.push(song);
                 }
-           },
-           Err(_) => ()
-       }
+            }
+            Err(_) => (),
+        }
     }
 
     // TODO Handle the case of empty libraries
