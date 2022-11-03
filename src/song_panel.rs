@@ -199,50 +199,40 @@ impl TrackSession {
         for (i, note) in backing_phrase.iter().enumerate() {
             if i == self.note_index {
                 lyrics.push(ui.fonts().layout_no_wrap(
-                    note.lyric.clone(),
+                    note.lyric.clone() + " ",
                     self.font_id.clone(),
                     epaint::color::Color32::BLUE,
                 ));
             } else {
                 lyrics.push(ui.fonts().layout_no_wrap(
-                    note.lyric.clone(),
+                    note.lyric.clone() + " ",
                     self.font_id.clone(),
-                    epaint::color::Color32::BLUE,
+                    epaint::color::Color32::WHITE,
                 ));
             }
         }
 
-        let text_positions = set_text_in_line(egui::Pos2::ZERO, &lyrics);
-        let partial_shapes: Vec<(&egui::Pos2, &Arc<epaint::text::Galley>)> =
-            text_positions.iter().zip(lyrics.iter()).collect();
-        for (text_position, lyric) in partial_shapes.iter() {
+        let lyric_widths: Vec<f32> = lyrics.iter().map(|lyric| lyric.size().x).collect();
+        let total_width = lyric_widths.iter().fold(0.0, |x, y| x + y);
+        let mut current_x = (ui.available_width() - total_width) / 2.0;
+        let current_y = lyrics.get(0).unwrap().size().y / 2.0 + 10.0;
+        for lyric in lyrics {
             shapes.push(egui::Shape::Text(epaint::TextShape {
-                pos: **text_position,
-                galley: (*lyric).clone(),
+                pos: egui::Pos2 {
+                    x: current_x,
+                    y: current_y,
+                },
+                galley: lyric.clone(),
                 underline: epaint::Stroke::default(),
                 override_text_color: None,
                 angle: 0.0,
             }));
+            current_x += lyric.size().x;
         }
 
         painter.extend(shapes);
         response
     }
-}
-
-fn set_text_in_line(pos: egui::Pos2, lyrics: &Vec<Arc<epaint::text::Galley>>) -> Vec<egui::Pos2> {
-    let mut current_pos = pos;
-    let mut resulting_positions = vec![];
-    resulting_positions.push(current_pos);
-    for lyric in lyrics {
-        current_pos = egui::Pos2 {
-            x: lyric.size().x,
-            y: pos.y,
-        };
-        resulting_positions.push(current_pos);
-    }
-    resulting_positions.pop();
-    resulting_positions
 }
 
 fn note_path(note: Note, length: u32) -> Vec<(f32, f32)> {
