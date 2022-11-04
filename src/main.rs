@@ -77,6 +77,7 @@ impl Karaoke {
             Message::Focus(i) => self.library.select(i),
             Message::SelectFocused => {
                 self.state = KaraokeState::Playing;
+                self.scroll_position = self.library.selection_index as f32;
                 let song = self
                     .library
                     .songs
