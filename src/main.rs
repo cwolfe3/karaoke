@@ -68,12 +68,8 @@ impl Karaoke {
 
     fn handle_message(&mut self, message: Message) {
         match message {
-            Message::FocusUp => {
-                self.library.select_previous();
-            }
-            Message::FocusDown => {
-                self.library.select_next();
-            }
+            Message::FocusUp => self.library.select_previous(),
+            Message::FocusDown => self.library.select_next(),
             Message::Focus(i) => self.library.select(i),
             Message::SelectFocused => {
                 self.state = KaraokeState::Playing;
@@ -146,8 +142,8 @@ impl eframe::App for Karaoke {
                                 )
                                 .show(ui, |ui| {
                                     ui.with_layout(egui::Layout::top_down(egui::Align::Min), |ui| {
-                                        // let mut selection = self.library.selection_index;
-                                        let mut selected = false;
+                                        let mut clicked = false;
+                                        let mut clicked_index = 0;
                                         for (i, song) in self.library.songs[..].iter().enumerate() {
                                             // TODO add default image
                                             let mut button;
@@ -182,11 +178,16 @@ impl eframe::App for Karaoke {
                                                 );
                                             }
                                             if ui.add_sized([w, h], button).clicked() {
-                                                selected = true;
+                                                clicked = true;
+                                                clicked_index = i;
                                             };
                                         }
-                                        if selected {
-                                            self.handle_message(Message::SelectFocused);
+                                        if clicked {
+                                            if clicked_index == self.library.selection_index {
+                                                self.handle_message(Message::SelectFocused);
+                                            } else {
+                                                self.handle_message(Message::Focus(clicked_index))
+                                            }
                                         }
                                     })
                                 });
