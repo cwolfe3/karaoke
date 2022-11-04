@@ -1,7 +1,6 @@
-use std::fs::{DirEntry, File};
 use std::path::Path;
 
-use crate::song::Song;
+use crate::song::{self, Song};
 use crate::track::Track;
 
 pub struct SongLibrary {
@@ -10,60 +9,74 @@ pub struct SongLibrary {
 }
 
 impl SongLibrary {
-    pub fn read_songs(path: &Path) -> SongLibrary {
-        let path = Path::new(path);
-        let mut library = SongLibrary {
-            songs: Vec::new(),
+    pub fn new(path: &Path) -> SongLibrary {
+        let songs = SongLibrary::read_songs(path);
+        SongLibrary {
+            songs,
             selection_index: 0,
-        };
-
-        match path.read_dir() {
-            Ok(dir_iter) => {
-                for dir in dir_iter {
-                    match dir {
-                        Ok(dir_entry_ok) => {
-                            library.read_song(dir_entry_ok.path().as_path());
-                        }
-                        Err(_) => (),
-                    }
-                }
-                library
-            }
-            Err(_) => library,
         }
     }
 
-    fn read_song(&mut self, path: &Path) {
-        match path.read_dir() {
-            Ok(dir_iter) => {
-                let mut song = Song::new(
-                    "SONG NAME PLACEHOLDER".to_string(),
-                    "ARTIST NAME PLACEHOLDER".to_string(),
-                    "ALBUM NAME PLACEHOLDER".to_string(),
-                );
-                for dir in dir_iter {
-                    match dir {
-                        Ok(dir_entry_ok) => {
-                            let path = dir_entry_ok.path();
-                            let extension = path.extension();
-                            match extension {
-                                Some(s) => {
-                                    if s.to_string_lossy() == "track" {
-                                        let track = Track::read(path.as_path());
-                                        song.add_track("track 1".to_string(), track);
-                                    }
-                                }
-                                None => (),
-                            }
-                        }
-                        Err(_) => return (),
+    pub fn read_songs(path: &Path) -> Vec<Song> {
+        let path = Path::new(path);
+        let mut songs = Vec::new();
+
+        if let Ok(dir_iter) = path.read_dir() {
+            for dir in dir_iter {
+                if let Ok(dir_entry_ok) = dir {
+                    if let Ok(song) = SongLibrary::read_song(dir_entry_ok.path().as_path()) {
+                        songs.push(song);
                     }
                 }
-                if song.num_tracks() > 0 {
-                    self.songs.push(song);
-                }
             }
-            Err(_) => (),
+        }
+        songs
+    }
+
+    fn read_song(path: &Path) -> Result<Song, std::io::Error> {
+        let dir_iter = path.read_dir()?;
+        let mut tracks: Vec<Track> = vec![];
+        let mut img = None;
+        for dir in dir_iter {
+            let path = dir?.path();
+            let extension = path.extension();
+            match extension {
+                Some(s) => {
+                    let ext = s.to_string_lossy();
+                    if ext == "track" {
+                        let track = Track::read(path.as_path());
+                        match track {
+                            Ok(t) => tracks.push(t),
+                            Err(_) => continue,
+                        }
+                    } else if ext == "png" || ext == "jpg" || ext == "jpeg" {
+                        // TODO defer image loading until needed
+                        // very slow on debug target
+                        let mut unloaded_image = song::Image::new();
+                        unloaded_image.load_image(&path);
+                        img = Some(unloaded_image);
+                    }
+                }
+                None => (),
+            }
+        }
+        if tracks.len() > 0 {
+            // TODO load song metadata from fs
+            let mut song = Song::new(
+                tracks.get(0).unwrap().name.clone(),
+                "ARTIST NAME PLACEHOLDER".to_string(),
+                "ALBUM NAME PLACEHOLDER".to_string(),
+                img,
+            );
+            for track in tracks {
+                song.add_track(track.name.clone(), track);
+            }
+            Ok(song)
+        } else {
+            Err(std::io::Error::new(
+                std::io::ErrorKind::Other,
+                "Could not read track information",
+            ))
         }
     }
 

@@ -48,7 +48,12 @@ enum Message {
 
 impl Karaoke {
     fn new(cc: &eframe::CreationContext<'_>) -> Self {
-        let library = SongLibrary::read_songs(std::path::Path::new("songs"));
+        let mut library = SongLibrary::new(std::path::Path::new("songs"));
+        for song in library.songs.iter_mut() {
+            if let Some(cover) = &mut song.album_cover {
+                cover.load_texture(&cc.egui_ctx);
+            }
+        }
         Karaoke {
             state: KaraokeState::Library,
             library,
@@ -77,9 +82,8 @@ impl Karaoke {
                     .songs
                     .get(self.library.selection_index)
                     .unwrap();
-                let track1 = song.tracks.get("track 1").unwrap();
+                let track1 = song.tracks.values().next().unwrap();
                 self.session = TrackSession::new(track1.clone());
-                println!("Selected");
             }
             Message::Play => (),
             Message::Pause => (),
@@ -144,7 +148,17 @@ impl eframe::App for Karaoke {
                                         // let mut selection = self.library.selection_index;
                                         let mut selected = false;
                                         for (i, song) in self.library.songs[..].iter().enumerate() {
-                                            let mut button = egui::Button::new(song.name.clone());
+                                            // TODO add default image
+                                            let mut button = egui::Button::new("");
+                                            if let Some(cover) = &song.album_cover {
+                                                button = egui::Button::image_and_text(
+                                                    cover.texture.as_ref().unwrap().id(),
+                                                    egui::vec2(h * 0.8, h * 0.8),
+                                                    song.name.clone(),
+                                                );
+                                            } else {
+                                                button = egui::Button::new(song.name.clone());
+                                            }
                                             if self.library.selection_index == i {
                                                 button = button.stroke(
                                                     ctx.style().visuals.widgets.hovered.fg_stroke,

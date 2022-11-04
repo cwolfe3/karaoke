@@ -10,6 +10,7 @@ pub type NoteIndex = (usize, usize);
 
 #[derive(Clone)]
 pub struct Track {
+    pub name: String,
     pub phrases: Vec<Phrase>,
     pub select_mode: SelectMode,
     pub select_begin: NoteIndex,
@@ -27,6 +28,7 @@ pub enum SelectMode {
 impl Track {
     pub fn new() -> Self {
         Track {
+            name: "NAME_PLACEHOLDER".to_string(),
             phrases: Vec::new(),
             select_mode: SelectMode::Note,
             select_begin: (0, 0),
@@ -248,21 +250,19 @@ impl Track {
         (self.select_begin, self.select_end)
     }
 
-    pub fn read(path: &Path) -> Self {
-        let display = path.display();
-        let mut file = match File::open(&path) {
-            Err(why) => panic!("Couldn't open {}: {}", display, why),
-            Ok(file) => file,
-        };
+    pub fn read(path: &Path) -> Result<Self, std::io::Error> {
+        let mut file = File::open(&path)?;
         let mut s = String::new();
-        match file.read_to_string(&mut s) {
-            Err(why) => panic!("Couldn't read {}: {}", display, why),
-            Ok(_) => println!("Read from {}", display),
-        }
+        file.read_to_string(&mut s)?;
 
         let mut track = Self::new();
-        let phrases: Vec<&str> = s.split('\n').collect();
-        for phrase in phrases {
+        let phrases = s.split('\n').collect::<Vec<&str>>();
+        let mut phrases_iter = phrases.iter();
+        track.name = match phrases_iter.next() {
+            Some(s) => s.clone().to_string(),
+            None => return Err(std::io::Error::new(std::io::ErrorKind::Other, "Track file is empty")),
+        };
+        for phrase in phrases_iter {
             let notes = phrase.split('|');
             let mut first = true;
             for note in notes {
@@ -271,7 +271,7 @@ impl Track {
                     continue;
                 }
                 let voiced = if fields[0] == "u" { false } else { true };
-                let pitch = fields[1].parse::<i8>().unwrap();
+                let pitch = fields[1].parse::<i8>().unwrap();  //TODO handle bad files
                 let length = fields[2].parse::<u32>().unwrap();
                 let lyric = fields[3].to_string();
                 let note = Note::new(length, pitch, voiced, lyric);
@@ -285,7 +285,7 @@ impl Track {
                 }
             }
         }
-        track
+        Ok(track)
     }
 
     pub fn write(&self, path: &Path) {
