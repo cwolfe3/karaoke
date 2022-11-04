@@ -150,15 +150,21 @@ impl eframe::App for Karaoke {
                                         let mut selected = false;
                                         for (i, song) in self.library.songs[..].iter().enumerate() {
                                             // TODO add default image
-                                            let mut button = egui::Button::new("");
+                                            let mut button;
+                                            let button_label = [
+                                                song.name.clone(),
+                                                song.artist.clone(),
+                                                song.album.clone(),
+                                            ]
+                                            .join("\n");
                                             if let Some(cover) = &song.album_cover {
                                                 button = egui::Button::image_and_text(
                                                     cover.texture.as_ref().unwrap().id(),
                                                     egui::vec2(h * 0.8, h * 0.8),
-                                                    song.name.clone(),
+                                                    button_label,
                                                 );
                                             } else {
-                                                button = egui::Button::new(song.name.clone());
+                                                button = egui::Button::new(button_label);
                                             }
                                             if self.library.selection_index == i {
                                                 button = button.stroke(
