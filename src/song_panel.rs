@@ -3,16 +3,18 @@ use eframe::egui::{self, epaint};
 use std::sync::Arc;
 use std::time::{Duration, Instant};
 
+use crate::frame_splitter::FrameSplitter;
 use crate::mic::Microphone;
 use crate::note::Note;
-use crate::song::Song;
+use crate::song::{Image, Song};
 use crate::track::Track;
 
 pub struct TrackSession {
-    backing_track: Track,
+    song: Song,
     mic: Microphone,
     track: Track,
     pub state: State,
+    frame_splitter: Option<FrameSplitter>,
     elapsed_time: Duration,
     elapsed_time_goal: Duration,
     last_update_time: Instant,
@@ -35,17 +37,19 @@ pub enum State {
 }
 
 impl TrackSession {
-    pub fn new(backing_track: Track) -> Option<TrackSession> {
-        if backing_track.phrases.is_empty() || backing_track.phrases.get(0)?.is_empty() {
-            return None;
-        }
+    pub fn new(song: Song) -> Result<TrackSession, std::io::Error> {
+        let backing_track = song.tracks.values().next().unwrap();
         let initial_note = backing_track.get_phrase(0).unwrap().get(0).unwrap();
         let initial_note_length = initial_note.length;
-        Some(TrackSession {
-            backing_track,
+        let video_path = song.video_path.clone();
+        Ok(TrackSession {
+            song,
             mic: Microphone::new(cpal::default_host().default_output_device().expect("")),
             track: Track::new(),
             state: State::Playing,
+            frame_splitter: Some(FrameSplitter::new(
+                &video_path.expect("No video found").to_path_buf(),
+            )?),
             elapsed_time: Duration::ZERO,
             elapsed_time_goal: Duration::ZERO,
             last_update_time: Instant::now(),
@@ -67,19 +71,20 @@ impl TrackSession {
     }
 
     fn next_chunk(&mut self) {
+        let backing_track = self.song.tracks.values().next().unwrap();
         self.chunk_index += 1;
         if self.chunk_index >= self.chunk_lengths.len() {
             self.chunk_index = 0;
             self.note_index += 1;
-            if self.note_index >= self.backing_track.phrases[self.phrase_index].len() {
+            if self.note_index >= backing_track.phrases[self.phrase_index].len() {
                 self.note_index = 0;
                 self.phrase_index += 1;
-                if self.phrase_index >= self.backing_track.phrases.len() {
+                if self.phrase_index >= backing_track.phrases.len() {
                     self.finish();
                     return;
                 }
             }
-            let note_length = self.backing_track.phrases[self.phrase_index][self.note_index].length;
+            let note_length = backing_track.phrases[self.phrase_index][self.note_index].length;
             self.chunk_lengths = Self::split_into_chunks(note_length);
         }
     }
@@ -87,6 +92,7 @@ impl TrackSession {
     fn ready(&self) -> bool {
         let mic_ready = self.mic.ready();
         let remaining = self.elapsed_time_goal.saturating_sub(self.elapsed_time);
+        println!("elapsed time: {:?}, elasped time goal: {:?}", self.elapsed_time, self.elapsed_time_goal);
         let chunk_length = self.chunk_lengths[self.chunk_index];
         return mic_ready && chunk_length <= remaining.as_millis() as u32;
     }
@@ -101,6 +107,7 @@ impl TrackSession {
     }
 
     pub fn tick(&mut self) {
+        let backing_track = self.song.tracks.values().next().unwrap().clone();
         match self.state {
             State::Playing => {
                 self.elapsed_time_goal = self
@@ -109,7 +116,7 @@ impl TrackSession {
                 self.last_update_time = Instant::now();
 
                 while self.ready() {
-                    let current_phrase = self.backing_track.get_phrase(self.phrase_index);
+                    let current_phrase = backing_track.get_phrase(self.phrase_index);
 
                     match current_phrase {
                         Some(phrase) => {
@@ -130,6 +137,7 @@ impl TrackSession {
                         None => break,
                     }
                 }
+                println!("DONE");
             }
             State::Paused => {
                 self.last_update_time = Instant::now();
@@ -138,15 +146,8 @@ impl TrackSession {
         }
     }
 
-    fn update(&mut self, message: Message) {
-        match message {
-            Message::Tick => {
-                self.tick();
-            }
-        }
-    }
-
-    pub fn draw(&self, ui: &mut egui::Ui) -> egui::Response {
+    pub fn draw(&mut self, ui: &mut egui::Ui) -> egui::Response {
+        let backing_track = self.song.tracks.values().next().unwrap();
         let (mut response, painter) =
             ui.allocate_painter(ui.available_size(), egui::Sense::focusable_noninteractive());
 
@@ -155,9 +156,36 @@ impl TrackSession {
             response.rect,
         );
         let from_screen = to_screen.inverse();
+        let screen_width = ui.ctx().input().screen_rect().width();
+        let screen_height = ui.ctx().input().screen_rect().height();
+
+        let frame_splitter = self.frame_splitter.as_mut().unwrap();
+        let frame = frame_splitter.next_frame();
+        let mut video_frame = Image::new();
+        video_frame.load_rgb_image_from_memory(
+            ui.ctx(),
+            frame_splitter.width,
+            frame_splitter.height,
+            frame,
+        );
+        let mut mesh = egui::Mesh::with_texture(video_frame.texture.as_ref().unwrap().id());
+        mesh.add_rect_with_uv(
+            egui::Rect::from_two_pos(
+                egui::pos2(0.0, 0.0),
+                egui::pos2(screen_width, screen_height),
+            ),
+            egui::Rect::from_two_pos(egui::pos2(0.0, 0.0), egui::pos2(1.0, 1.0)),
+            epaint::Color32::WHITE,
+        );
+        painter.add(egui::Shape::mesh(mesh));
+
+        // ui.image(
+        //     video_frame.texture.as_ref().unwrap().id(),
+        //     egui::vec2(screen_width, screen_height),
+        // );
 
         let mut shapes = vec![];
-        let backing_phrase = &self.backing_track.phrases[self.phrase_index];
+        let backing_phrase = &backing_track.phrases[self.phrase_index];
         let mut length = 0;
 
         let backing_stroke = epaint::Stroke::new(4.0, epaint::color::Color32::GRAY);

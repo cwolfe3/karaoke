@@ -37,6 +37,7 @@ impl SongLibrary {
         let dir_iter = path.read_dir()?;
         let mut tracks: Vec<Track> = vec![];
         let mut img = None;
+        let mut video_path = None;
         for dir in dir_iter {
             let path = dir?.path();
             let extension = path.extension();
@@ -55,6 +56,8 @@ impl SongLibrary {
                         let mut unloaded_image = song::Image::new();
                         unloaded_image.load_image(&path);
                         img = Some(unloaded_image);
+                    } else if ext == "webm" || ext == "mkv" || ext == "mp4" {
+                        video_path = Some(path.to_path_buf());
                     }
                 }
                 None => (),
@@ -67,6 +70,7 @@ impl SongLibrary {
                 "ARTIST NAME PLACEHOLDER".to_string(),
                 "ALBUM NAME PLACEHOLDER".to_string(),
                 img,
+                video_path,
             );
             for track in tracks {
                 song.add_track(track.name.clone(), track);

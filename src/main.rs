@@ -1,5 +1,6 @@
 //use std::env;
 
+mod frame_splitter;
 mod mic;
 mod note;
 mod song;
@@ -9,6 +10,7 @@ mod song_view;
 mod track;
 
 use eframe::egui;
+use frame_splitter::FrameSplitter;
 
 use crate::song_library::SongLibrary;
 use crate::song_panel::TrackSession;
@@ -107,8 +109,12 @@ impl Karaoke {
                         .songs
                         .get(self.library.selection_index)
                         .unwrap();
-                    let track1 = song.tracks.values().next().unwrap();
-                    self.session = TrackSession::new(track1.clone());
+                    self.session = if let Ok(session) = TrackSession::new(song.clone()) {
+                        Some(session)
+                    } else {
+                        //TODO handle not being able to load song
+                        None
+                    }
                 }
                 KaraokeState::Playing => (),
                 KaraokeState::Paused => (),
@@ -257,7 +263,7 @@ impl eframe::App for Karaoke {
                     )
                 }
                 KaraokeState::Playing => egui::Frame::none().show(ui, |ui| {
-                    egui::Frame::canvas(ui.style()).show(ui, |ui| match &self.session {
+                    egui::Frame::canvas(ui.style()).show(ui, |ui| match &mut self.session {
                         Some(some_session) => some_session.draw(ui),
                         None => ui.label("Unable to play"),
                     });
