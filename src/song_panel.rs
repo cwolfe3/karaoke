@@ -92,7 +92,6 @@ impl TrackSession {
     fn ready(&self) -> bool {
         let mic_ready = self.mic.ready();
         let remaining = self.elapsed_time_goal.saturating_sub(self.elapsed_time);
-        println!("elapsed time: {:?}, elasped time goal: {:?}", self.elapsed_time, self.elapsed_time_goal);
         let chunk_length = self.chunk_lengths[self.chunk_index];
         return mic_ready && chunk_length <= remaining.as_millis() as u32;
     }
@@ -130,14 +129,14 @@ impl TrackSession {
                             self.track.phrases[self.phrase_index].push(sung_note);
 
                             self.next_chunk();
-                            self.mic.set_window_length(Duration::from_millis(
-                                self.chunk_lengths[self.chunk_index].into(),
-                            ))
+                            let chunk_duration =
+                                Duration::from_millis(self.chunk_lengths[self.chunk_index].into());
+                            self.elapsed_time = self.elapsed_time.saturating_add(chunk_duration);
+                            self.mic.set_window_length(chunk_duration);
                         }
                         None => break,
                     }
                 }
-                println!("DONE");
             }
             State::Paused => {
                 self.last_update_time = Instant::now();
