@@ -27,16 +27,20 @@ struct Karaoke {
                           // every tick.
 }
 
+#[derive(Debug, Clone, Eq, PartialEq)]
 enum KaraokeState {
     Library,
+    SongSelection,
     Playing,
     Paused,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Eq, PartialEq)]
 enum Message {
     FocusUp,
     FocusDown,
+    FocusRight,
+    FocusLeft,
     Focus(usize),
     SelectFocused,
     Play,
@@ -68,20 +72,47 @@ impl Karaoke {
 
     fn handle_message(&mut self, message: Message) {
         match message {
-            Message::FocusUp => self.library.select_previous(),
-            Message::FocusDown => self.library.select_next(),
+            Message::FocusUp => match self.state {
+                KaraokeState::Library => self.library.select_previous(),
+                KaraokeState::SongSelection => (),
+                KaraokeState::Playing => (),
+                KaraokeState::Paused => (),
+            },
+            Message::FocusDown => match self.state {
+                KaraokeState::Library => self.library.select_next(),
+                KaraokeState::SongSelection => (),
+                KaraokeState::Playing => (),
+                KaraokeState::Paused => (),
+            },
+            Message::FocusRight => match self.state {
+                KaraokeState::Library => self.state = KaraokeState::SongSelection,
+                KaraokeState::SongSelection => (),
+                KaraokeState::Playing => (),
+                KaraokeState::Paused => (),
+            },
+            Message::FocusLeft => match self.state {
+                KaraokeState::Library => (),
+                KaraokeState::SongSelection => self.state = KaraokeState::Library,
+                KaraokeState::Playing => (),
+                KaraokeState::Paused => (),
+            },
             Message::Focus(i) => self.library.select(i),
-            Message::SelectFocused => {
-                self.state = KaraokeState::Playing;
-                self.scroll_position = self.library.selection_index as f32;
-                let song = self
-                    .library
-                    .songs
-                    .get(self.library.selection_index)
-                    .unwrap();
-                let track1 = song.tracks.values().next().unwrap();
-                self.session = TrackSession::new(track1.clone());
-            }
+            Message::SelectFocused => match self.state {
+                KaraokeState::Library => self.handle_message(Message::FocusRight),
+                KaraokeState::SongSelection => {
+                    self.state = KaraokeState::Playing;
+                    self.scroll_position = self.library.selection_index as f32;
+                    let song = self
+                        .library
+                        .songs
+                        .get(self.library.selection_index)
+                        .unwrap();
+                    let track1 = song.tracks.values().next().unwrap();
+                    self.session = TrackSession::new(track1.clone());
+                }
+                KaraokeState::Playing => (),
+                KaraokeState::Paused => (),
+            },
             Message::Play => (),
             Message::Pause => (),
             Message::Resume => (),
@@ -93,6 +124,9 @@ impl Karaoke {
     fn tick(&mut self) {
         match self.state {
             KaraokeState::Library => {
+                self.update_scroll_position();
+            }
+            KaraokeState::SongSelection => {
                 self.update_scroll_position();
             }
             KaraokeState::Playing => match &mut self.session {
@@ -126,11 +160,11 @@ impl eframe::App for Karaoke {
         let screen_height = ctx.input().screen_rect().height();
         egui::CentralPanel::default().show(ctx, |ui| {
             match &self.state {
-                KaraokeState::Library => {
+                KaraokeState::Library | KaraokeState::SongSelection => {
                     ui.with_layout(
                         egui::Layout::left_to_right(egui::Align::Min).with_cross_justify(true),
                         |ui| {
-                            let w = screen_width * 0.5;
+                            let w = screen_width * 0.35;
                             let h = screen_height * 0.166;
                             egui::ScrollArea::vertical()
                                 .auto_shrink([true, true])
@@ -162,7 +196,9 @@ impl eframe::App for Karaoke {
                                             } else {
                                                 button = egui::Button::new(button_label);
                                             }
-                                            if self.library.selection_index == i {
+                                            if self.library.selection_index == i
+                                                && self.state == KaraokeState::Library
+                                            {
                                                 button = button.stroke(
                                                     ctx.style().visuals.widgets.hovered.fg_stroke,
                                                 );
@@ -192,7 +228,31 @@ impl eframe::App for Karaoke {
                                     })
                                 });
                             ui.separator();
-                            ui.label("SONG_INFORMATION");
+                            ui.vertical(|ui| {
+                                if let Some(cover) = &self
+                                    .library
+                                    .songs
+                                    .get(self.library.selection_index)
+                                    .unwrap()
+                                    .album_cover
+                                {
+                                    ui.image(
+                                        cover.texture.as_ref().unwrap().id(),
+                                        egui::vec2(
+                                            (screen_width - w) * 0.5,
+                                            (screen_width - w) * 0.5,
+                                        ),
+                                    );
+                                }
+                                let mut play_button = egui::Button::new("Play Now");
+                                if self.state == KaraokeState::SongSelection {
+                                    play_button = play_button
+                                        .stroke(ctx.style().visuals.widgets.hovered.fg_stroke);
+                                    play_button = play_button
+                                        .fill(ctx.style().visuals.widgets.hovered.bg_fill);
+                                }
+                                ui.add_sized([(screen_width - w) * 0.5, 30.0], play_button);
+                            });
                         },
                     )
                 }
@@ -221,6 +281,12 @@ fn handle_input(karaoke: &mut Karaoke, ctx: &egui::Context) {
     }
     if ctx.input().key_pressed(egui::Key::ArrowUp) {
         karaoke.handle_message(Message::FocusUp);
+    }
+    if ctx.input().key_pressed(egui::Key::ArrowLeft) {
+        karaoke.handle_message(Message::FocusLeft);
+    }
+    if ctx.input().key_pressed(egui::Key::ArrowRight) {
+        karaoke.handle_message(Message::FocusRight);
     }
     if ctx.input().key_pressed(egui::Key::Enter) {
         karaoke.handle_message(Message::SelectFocused);
