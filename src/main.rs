@@ -8,6 +8,7 @@ mod song_library;
 mod song_panel;
 mod song_view;
 mod track;
+mod timer;
 
 use eframe::egui;
 use frame_splitter::FrameSplitter;

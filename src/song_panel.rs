@@ -1,12 +1,13 @@
 use cpal::traits::HostTrait;
 use eframe::egui::{self, epaint};
 use std::sync::Arc;
-use std::time::{Duration, Instant};
+use std::time::Duration;
 
 use crate::frame_splitter::FrameSplitter;
 use crate::mic::Microphone;
 use crate::note::Note;
 use crate::song::{Image, Song};
+use crate::timer::Timer;
 use crate::track::Track;
 
 pub struct TrackSession {
@@ -15,9 +16,7 @@ pub struct TrackSession {
     track: Track,
     pub state: State,
     frame_splitter: Option<FrameSplitter>,
-    elapsed_time: Duration,
-    elapsed_time_goal: Duration,
-    last_update_time: Instant,
+    timer: Timer,
     phrase_index: usize,
     note_index: usize,
     chunk_lengths: Vec<u32>,
@@ -50,9 +49,7 @@ impl TrackSession {
             frame_splitter: Some(FrameSplitter::new(
                 &video_path.expect("No video found").to_path_buf(),
             )?),
-            elapsed_time: Duration::ZERO,
-            elapsed_time_goal: Duration::ZERO,
-            last_update_time: Instant::now(),
+            timer: Timer::new(),
             phrase_index: 0,
             note_index: 0,
             chunk_lengths: Self::split_into_chunks(initial_note_length),
@@ -89,9 +86,9 @@ impl TrackSession {
         }
     }
 
-    fn ready(&self) -> bool {
+    fn ready(&mut self) -> bool {
         let mic_ready = self.mic.ready();
-        let remaining = self.elapsed_time_goal.saturating_sub(self.elapsed_time);
+        let remaining = self.timer.time_left_to_process();
         let chunk_length = self.chunk_lengths[self.chunk_index];
         return mic_ready && chunk_length <= remaining.as_millis() as u32;
     }
@@ -109,14 +106,11 @@ impl TrackSession {
         let backing_track = self.song.tracks.values().next().unwrap().clone();
         match self.state {
             State::Playing => {
-                self.elapsed_time_goal = self
-                    .elapsed_time_goal
-                    .saturating_add(self.last_update_time.elapsed());
-                self.last_update_time = Instant::now();
-
+                if self.timer.is_paused() {
+                    self.timer.resume();
+                }
                 while self.ready() {
                     let current_phrase = backing_track.get_phrase(self.phrase_index);
-
                     match current_phrase {
                         Some(phrase) => {
                             let current_note = &phrase[self.note_index];
@@ -131,7 +125,8 @@ impl TrackSession {
                             self.next_chunk();
                             let chunk_duration =
                                 Duration::from_millis(self.chunk_lengths[self.chunk_index].into());
-                            self.elapsed_time = self.elapsed_time.saturating_add(chunk_duration);
+                            self.timer.process(chunk_duration);
+                            println!("elapsed time: {:?}", self.timer.elapsed_time());
                             self.mic.set_window_length(chunk_duration);
                         }
                         None => break,
@@ -139,7 +134,7 @@ impl TrackSession {
                 }
             }
             State::Paused => {
-                self.last_update_time = Instant::now();
+                self.timer.pause();
             }
             State::Finished => {}
         }

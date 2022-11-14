@@ -74,7 +74,7 @@ impl Image {
     ) {
         let rgba_data = data;
         let image = egui::ColorImage::from_rgba_unmultiplied([width, height], &rgba_data);
-        self.texture = Some(ctx.load_texture("PLACEHOLDER", image, egui::TextureFilter::Nearest));
+        self.texture = Some(ctx.load_texture("PLACEHOLDER", image, egui::TextureFilter::Linear));
     }
 
     pub fn load_texture(&mut self, ctx: &egui::Context) {
