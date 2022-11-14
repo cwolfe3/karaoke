@@ -37,10 +37,11 @@ impl Timer {
     }
 
     pub fn duration_since_touch(&mut self) -> Duration {
-        self.elapsed_time_since_touch.saturating_add(match self.paused {
-            true => Duration::ZERO,
-            false => Instant::now().duration_since(self.last_touch.max(self.last_resume_time))
-        })
+        self.elapsed_time_since_touch
+            .saturating_add(match self.paused {
+                true => Duration::ZERO,
+                false => Instant::now().duration_since(self.last_touch.max(self.last_resume_time)),
+            })
     }
 
     pub fn process(&mut self, time: Duration) {

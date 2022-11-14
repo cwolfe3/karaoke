@@ -126,7 +126,6 @@ impl TrackSession {
                             let chunk_duration =
                                 Duration::from_millis(self.chunk_lengths[self.chunk_index].into());
                             self.timer.process(chunk_duration);
-                            println!("elapsed time: {:?}", self.timer.elapsed_time());
                             self.mic.set_window_length(chunk_duration);
                         }
                         None => break,
@@ -154,7 +153,7 @@ impl TrackSession {
         let screen_height = ui.ctx().input().screen_rect().height();
 
         let frame_splitter = self.frame_splitter.as_mut().unwrap();
-        let frame = frame_splitter.next_frame();
+        let frame = frame_splitter.current_frame(&mut self.timer);
         let mut video_frame = Image::new();
         video_frame.load_rgb_image_from_memory(
             ui.ctx(),
