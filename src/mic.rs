@@ -1,9 +1,9 @@
-use cpal::traits::{DeviceTrait, HostTrait, StreamTrait};
+use cpal::traits::{DeviceTrait, StreamTrait};
 use cpal::StreamConfig;
 use futures::Stream;
 use ringbuf::RingBuffer;
 use rustfft::{num_complex::Complex, FftPlanner};
-use std::{thread, time};
+use std::time;
 
 use crate::note::Note;
 
@@ -200,7 +200,7 @@ impl Stream for Microphone {
     type Item = Note;
     fn poll_next(
         mut self: std::pin::Pin<&mut Self>,
-        cx: &mut std::task::Context<'_>,
+        _cx: &mut std::task::Context<'_>,
     ) -> std::task::Poll<Option<Self::Item>> {
         if self.ready() {
             std::task::Poll::Ready(self.consume())

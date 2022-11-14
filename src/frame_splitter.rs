@@ -1,5 +1,4 @@
 use std::io::Read;
-use std::time::Duration;
 use std::{
     path::{Path, PathBuf},
     process::{ChildStdout, Command, Stdio},
@@ -20,7 +19,6 @@ pub struct FrameSplitter {
 
 impl FrameSplitter {
     pub fn new(path: &Path) -> Result<Self, std::io::Error> {
-        // Command::new("ffmpeg -i my-immortal.webm -f image2pipe -pix_fmt rgb8 -c:v rawvideo -");
         let (width, height) = Self::read_dimensions(path)?;
         let fps = Self::read_fps(path)?;
         let raw_data_handle = Self::initialize_pipe(path)?;

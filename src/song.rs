@@ -4,7 +4,7 @@ use std::{
     path::{Path, PathBuf},
 };
 
-use crate::{frame_splitter::FrameSplitter, track::Track};
+use crate::track::Track;
 
 pub type Name = String;
 pub type Artist = String;

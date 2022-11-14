@@ -1,5 +1,3 @@
-//use std::env;
-
 mod frame_splitter;
 mod mic;
 mod note;
@@ -11,15 +9,9 @@ mod timer;
 mod track;
 
 use eframe::egui;
-use frame_splitter::FrameSplitter;
 
 use crate::song_library::SongLibrary;
 use crate::song_panel::TrackSession;
-//use std::path::Path;
-//use song::Song;
-//use song_view::SongView;
-//use cursive::views;
-//use cursive::traits::Nameable;
 
 struct Karaoke {
     state: KaraokeState,
@@ -160,7 +152,7 @@ impl Karaoke {
 }
 
 impl eframe::App for Karaoke {
-    fn update(&mut self, ctx: &egui::Context, frame: &mut eframe::Frame) {
+    fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
         handle_input(self, ctx);
         self.handle_message(Message::Tick);
         let screen_width = ctx.input().screen_rect().width();
@@ -307,8 +299,8 @@ fn main() {
         native_options,
         Box::new(|cc| Box::new(Karaoke::new(cc))),
     )
-    //let song = Song::read(Path::new("test.song"));
 
+    //let song = Song::read(Path::new("test.song"));
     //let mut siv = cursive::default();
     //siv.add_global_callback('q', |s| s.quit());
     //siv.add_layer(views::ScrollView::new(SongView::new(song).with_name("view")).scroll_x(true));

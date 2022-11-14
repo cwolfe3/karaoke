@@ -25,10 +25,6 @@ pub struct TrackSession {
     font_id: epaint::text::FontId,
 }
 
-enum Message {
-    Tick,
-}
-
 pub enum State {
     Playing,
     Paused,
@@ -141,7 +137,7 @@ impl TrackSession {
 
     pub fn draw(&mut self, ui: &mut egui::Ui) -> egui::Response {
         let backing_track = self.song.tracks.values().next().unwrap();
-        let (mut response, painter) =
+        let (response, painter) =
             ui.allocate_painter(ui.available_size(), egui::Sense::focusable_noninteractive());
 
         let to_screen = egui::emath::RectTransform::from_to(
